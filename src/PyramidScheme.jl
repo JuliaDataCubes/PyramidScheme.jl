@@ -2,7 +2,11 @@ module PyramidScheme
 using DiskArrayEngine
 using DiskArrays
 using Zarr
+using NetCDF
+using Plots
+using PyramidScheme
 
+using Statistics
 function aggregate_by_factor(xout,x,f)
     fac = ceil(Int,size(x,1)/size(xout,1))
     for j in 1:size(xout,2)
@@ -72,7 +76,33 @@ function arraywindows(s,w)
     end
 end
 
+using Colors
 
+#testdata = Float32[sin(x)*cos(y) for x in range(0,15,3000), y in range(0,10,2000)];
+allatts = NetCDF.open("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lccs_class").atts
+
+scol = split(allatts["flag_colors"]," ")
+colm = [colorant"black";parse.(Color,scol)]
+
+flv = allatts["flag_values"]
+
+
+testdata = view(NetCDF.open("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lccs_class"),:,:,1)
+
+
+lon= ncread("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lon")
+lat= ncread("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lat")
+
+input_axes = (lon,lat)
+
+n_level = ceil(Int,log2(maximum(size(testdata))/1024))
+agg_axis(x,n) = mean.(Iterators.partition(x,n))
+
+pyramid_sizes =  [ceil.(Int, size(testdata) ./ 2^i) for i in 1:n_level]
+pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
+
+t = eltype(testdata)
+    
 function gen_output(t,s)
     outsize = sizeof(t)*prod(s)
     if outsize > 100e6
@@ -82,7 +112,19 @@ function gen_output(t,s)
         zeros(t,s...)
     end
 end
+output_arrays = [gen_output(UInt8,p) for p in pyramid_sizes]
 
+f = ESALCMode()
+
+fill_pyramids(testdata,output_arrays,f,true)
+
+
+#Now some plotting code
+colmap = similar(colm,256)
+for i in 1:length(flv)
+    colmap[Int(flv[i])+1] = colm[i]
+end
+size(testdata)
 
 function plot_im(data,colmap,cent,imsize;target_imsize = (1024,512))
     n_agg = ceil(Int,minimum(log2.(imsize./target_imsize)))+1
@@ -100,5 +142,60 @@ function plot_im(data,colmap,cent,imsize;target_imsize = (1024,512))
         colmap[Int(ix)+1]
     end)
 end
+
+
+mutable struct Viewer
+    data
+    colmap
+    center
+    zoom
+end
+zoom_out(v::Viewer) = v.zoom = v.zoom*1.3
+zoom_in(v::Viewer) = v.zoom = v.zoom/1.3
+move_right(v::Viewer) = v.center = round.(Int,(v.center[1]+300*v.zoom,v.center[2]))
+move_left(v::Viewer) = v.center = round.(Int,(v.center[1]-300*v.zoom,v.center[2]))
+move_down(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]+300*v.zoom))
+move_up(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]-300*v.zoom))
+function doplot(v::Viewer)
+    target_imsize = (1024,512)
+    imsize = round.(Int,v.zoom .*target_imsize)
+    plot_im(v.data,v.colmap, v.center,imsize)
+end
+
+function apply_input(v,x)
+    if x=='a'
+        move_left(v)
+    elseif x == 'd'
+        move_right(v)
+    elseif x == 'w'
+        move_up(v)
+    elseif x == 's'
+        move_down(v)
+    elseif x == 'k'
+        zoom_in(v)
+    elseif x == 'l'
+        zoom_out(v)
+    else 
+        return 1
+    end
+    0
+end
+
+data = [testdata,output_arrays...]
+
+v = Viewer(data,colmap,(80000,30000),1.0)
+
+while true
+    inp = readline(stdin)
+    isempty(inp) && break
+    r = apply_input(v,first(inp))
+    if r == 1
+        break
+    else
+        display(doplot(v))
+    end
+end
+
+
 
 end
