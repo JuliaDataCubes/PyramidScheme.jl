@@ -1,12 +1,16 @@
 module PyramidScheme
-using DiskArrayEngine
-using DiskArrays
-using Zarr
-using NetCDF
-using Plots
-using PyramidScheme
+using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
+using DiskArrays: DiskArrays
+using Zarr: zcreate
 
 using Statistics
+
+"""
+    aggregate_by_factor(xout, x, f)
+
+Aggregate the data `x` using the function `f` and store the results in `xout`.
+This function is used as the inner function for the DiskArrayEngine call.
+"""
 function aggregate_by_factor(xout,x,f)
     fac = ceil(Int,size(x,1)/size(xout,1))
     for j in 1:size(xout,2)
@@ -17,7 +21,13 @@ function aggregate_by_factor(xout,x,f)
 end
 
 
-
+"""
+    all_pyramids!(xout, x, recursive, f)
+Compute all tiles of the pyramids for data `x` and store it in `xout`.
+Uses function `f` as a aggregating function.
+`recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
+This is an optimization which for functions like median might lead to misleading results.
+""" 
 function all_pyramids!(xout,x,recursive,f)
     xnow = x
     for i in 1:length(xout)
@@ -27,14 +37,25 @@ function all_pyramids!(xout,x,recursive,f)
         end
     end
 end
+
+"""
+    gen_pyr(x; recursive=true)
+Generate the pyramid for the data `x`.
+I do not understand what is `x`
+"""
 function gen_pyr(x...;recursive=true) 
     allx = Base.front(x)
     f = last(x)
     all_pyramids!(Base.front(allx),last(allx),recursive,f)
 end
 
-using DiskArrayEngine: MovingWindow, RegularWindows, InputArray
 
+"""
+    fill_pyramids(data, outputs, func, recursive)
+Fill the pyramids generated from the `data` with the aggregation function `func` into the list `outputs`.
+`recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
+This is an optimization which for functions like median might lead to misleading results.
+"""
 function fill_pyramids(data, outputs,func,recursive)
 
     n_level = length(outputs)
@@ -46,15 +67,19 @@ function fill_pyramids(data, outputs,func,recursive)
 
     oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
 
-    func = create_userfunction(gen_pyr,ntuple(_->eltype(data),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
+    func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(data),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
-    r = DiskArrayEngine.LocalRunner(op,lr,output_arrays,threaded=true)
+    r = DiskArrayEngine.LocalRunner(op,lr,outputs,threaded=true)
     run(r)
 end
 
+"""
+    ESALCMode(counts)
+
+"""
 struct ESALCMode
     counts::Vector{Vector{Int}}
 end
@@ -70,39 +95,41 @@ function (f::ESALCMode)(x)
 end
 
 
+"""
+    arraywindows(s,w)
+
+Construct a list of `RegularWindows` for the size list in `s` for windows `w`.
+??
+"""
 function arraywindows(s,w)
     map(s) do l
         RegularWindows(1,l,window=w)
     end
 end
 
-using Colors
-
-#testdata = Float32[sin(x)*cos(y) for x in range(0,15,3000), y in range(0,10,2000)];
-allatts = NetCDF.open("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lccs_class").atts
-
-scol = split(allatts["flag_colors"]," ")
-colm = [colorant"black";parse.(Color,scol)]
-
-flv = allatts["flag_values"]
 
 
-testdata = view(NetCDF.open("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lccs_class"),:,:,1)
 
+"""
+    compute_nlevels(data, tilesize=1024)
 
-lon= ncread("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lon")
-lat= ncread("../../data/C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc","lat")
+Compute the number of levels for the aggregation based on the size of `data`.
+"""
+compute_nlevels(data, tilesize=1024) = ceil(Int,log2(maximum(size(data))/tilesize))
 
-input_axes = (lon,lat)
-
-n_level = ceil(Int,log2(maximum(size(testdata))/1024))
 agg_axis(x,n) = mean.(Iterators.partition(x,n))
 
-pyramid_sizes =  [ceil.(Int, size(testdata) ./ 2^i) for i in 1:n_level]
-pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
+#pyramid_sizes(n_level) =  [ceil.(Int, size(testdata) ./ 2^i) for i in 1:n_level]
+#pyramid_axes(n_level) = [agg_axis.(input_axes,2^i) for i in 1:n_level]
 
-t = eltype(testdata)
-    
+#t = eltype(testdata)
+
+"""
+    gen_output(t,s)
+
+Create output array of type `t` and size `s`
+If the array is smaller than 100e6 it is created on disk and otherwise as a temporary zarr file.
+"""
 function gen_output(t,s)
     outsize = sizeof(t)*prod(s)
     if outsize > 100e6
@@ -112,20 +139,28 @@ function gen_output(t,s)
         zeros(t,s...)
     end
 end
-output_arrays = [gen_output(UInt8,p) for p in pyramid_sizes]
 
-f = ESALCMode()
+"""
+    output_arrays(pyramid_sizes)
 
-fill_pyramids(testdata,output_arrays,f,true)
+Create the output arrays for the given `pyramid_sizes`
+"""
+output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
+
+#f = ESALCMode()
+
+#fill_pyramids(testdata,output_arrays,f,true)
 
 
 #Now some plotting code
-colmap = similar(colm,256)
-for i in 1:length(flv)
-    colmap[Int(flv[i])+1] = colm[i]
-end
-size(testdata)
+#colmap = similar(colm,256)
+#for i in 1:length(flv)
+#    colmap[Int(flv[i])+1] = colm[i]
+#end
+#size(testdata)
 
+
+#=
 function plot_im(data,colmap,cent,imsize;target_imsize = (1024,512))
     n_agg = ceil(Int,minimum(log2.(imsize./target_imsize)))+1
     n_agg = clamp(n_agg,1,length(data))
@@ -196,6 +231,6 @@ while true
     end
 end
 
-
+=#
 
 end
