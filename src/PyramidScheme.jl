@@ -2,6 +2,7 @@ module PyramidScheme
 using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
 using DiskArrays: DiskArrays
 using Zarr: zcreate
+using DimensionalData: rebuild
 
 using Statistics
 
@@ -31,6 +32,7 @@ This is an optimization which for functions like median might lead to misleading
 function all_pyramids!(xout,x,recursive,f)
     xnow = x
     for i in 1:length(xout)
+        @debug "Pyramidnumber $i"
         aggregate_by_factor(xout[i],xnow,f)
         if recursive
             xnow = xout[i]
@@ -56,7 +58,7 @@ Fill the pyramids generated from the `data` with the aggregation function `func`
 `recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
 This is an optimization which for functions like median might lead to misleading results.
 """
-function fill_pyramids(data, outputs,func,recursive)
+function fill_pyramids(data, outputs,func,recursive;kwargs...)
 
     n_level = length(outputs)
     pixel_base_size = 2^n_level
@@ -67,12 +69,12 @@ function fill_pyramids(data, outputs,func,recursive)
 
     oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
 
-    func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(data),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
+    func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
-    r = DiskArrayEngine.LocalRunner(op,lr,outputs,threaded=true)
+    r = DiskArrayEngine.LocalRunner(op,lr,outputs;kwargs...)
     run(r)
 end
 
@@ -108,8 +110,6 @@ function arraywindows(s,w)
 end
 
 
-
-
 """
     compute_nlevels(data, tilesize=1024)
 
@@ -117,7 +117,7 @@ Compute the number of levels for the aggregation based on the size of `data`.
 """
 compute_nlevels(data, tilesize=1024) = ceil(Int,log2(maximum(size(data))/tilesize))
 
-agg_axis(x,n) = mean.(Iterators.partition(x,n))
+agg_axis(x,n) = rebuild(x, mean.(Iterators.partition(x,n)))
 
 #pyramid_sizes(n_level) =  [ceil.(Int, size(testdata) ./ 2^i) for i in 1:n_level]
 #pyramid_axes(n_level) = [agg_axis.(input_axes,2^i) for i in 1:n_level]
@@ -147,6 +147,20 @@ Create the output arrays for the given `pyramid_sizes`
 """
 output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 
+"""
+    selectlevel(pyramids, ext, resolution=10; target_imsize=(1024,512)
+Internal function to select the raster data that should be plotted on screen. 
+`pyramids` is a Vector of Raster objects with increasing coarsity. 
+`ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
+`target_imsize` is the target size of the output data that should be plotted.
+"""
+function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
+    imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
+    @show imsize
+    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
+    @show n_agg
+    pyramids[n_agg][ext]
+end
 #f = ESALCMode()
 
 #fill_pyramids(testdata,output_arrays,f,true)
