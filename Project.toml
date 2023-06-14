@@ -9,6 +9,7 @@ DiskArrayEngine = "2d4b2e14-ccd6-4284-b8b0-2378ace7c126"
 DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
 ImageBase = "c817782e-172a-44cc-b673-b171935fbb9e"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
