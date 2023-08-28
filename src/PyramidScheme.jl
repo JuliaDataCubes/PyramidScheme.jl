@@ -1,8 +1,12 @@
 module PyramidScheme
+
 using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
 using DiskArrays: DiskArrays
 using Zarr: zcreate
-using DimensionalData: rebuild
+using DimensionalData: rebuild, dims
+using GLMakie
+using Rasters
+using Extents
 
 using Statistics
 
@@ -75,6 +79,7 @@ function fill_pyramids(data, outputs,func,recursive;kwargs...)
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
+    #@show op
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
     r = DiskArrayEngine.LocalRunner(op,lr,outputs;kwargs...)
@@ -150,6 +155,26 @@ Create the output arrays for the given `pyramid_sizes`
 """
 output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 
+
+"""
+    getpyramids(ras)
+Compute the data of the pyramids of a given data cube `ras`.
+This returns the data of the pyramids and the dimension values of the aggregated axes.
+"""
+function getpyramids(reducefunc, ras;recursive=true)
+    input_axes = (dims(ras))
+    #testdata = arr.arrays["layer"]
+    n_level = compute_nlevels(ras)
+    pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
+    pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
+
+    outmin = output_arrays(pyramid_sizes, Float32)
+    fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
+
+    #[ras, Raster.(outmin, pyramid_axes)...];
+    outmin, pyramid_axes
+end
+
 """
     selectlevel(pyramids, ext, resolution=10; target_imsize=(1024,512)
 Internal function to select the raster data that should be plotted on screen. 
@@ -163,6 +188,45 @@ function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
     n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
     @show n_agg
     pyramids[n_agg][ext]
+end
+
+
+"""
+    plotpyramids(pyramids)
+A helper function to plot a dataset of pyramids.
+At the moment pyramids is expected to be a list of pyramids with the same extent. 
+"""
+function plotpyramids(pyramids;colorbar=true, kwargs...)
+    #This should be converted into a proper recipe for Makie but this would depend on a pyramid type.
+    fig = Figure()
+    lon, lat = dims(pyramids[1])
+    ax = Axis(fig[1,1], limits=(extrema(lon), extrema(lat)), aspect=DataAspect())
+    hmap = plotpyramids!(ax, pyramids;kwargs...)
+    if colorbar
+        Colorbar(fig[1,2], hmap)
+    end
+    ax.autolimitaspect = 1
+    fig, ax, hmap
+end
+
+function plotpyramids!(ax, pyramids;kwargs...)
+    data = Observable{Raster}(pyramids[end])
+    rasext = extent(pyramids[end])
+    on(ax.finallimits) do limits
+        @show limits
+        limext = Extents.extent(limits)
+        if Extents.intersects(rasext, limext)
+            data.val = selectlevel(pyramids, limext)
+        end
+        notify(data)
+    end
+    @show size(data.val)
+    
+    hmap = heatmap!(ax, data; interpolate=false, kwargs...)#, colorrange=(-8, -1))
+    #Colorbar(fig[1,2], hmap)
+    #ax.autolimitaspect = 1
+    #fig, ax, hmap
+    
 end
 #f = ESALCMode()
 
