@@ -14,9 +14,12 @@ This function is used as the inner function for the DiskArrayEngine call.
 """
 function aggregate_by_factor(xout,x,f)
     fac = ceil(Int,size(x,1)/size(xout,1))
-    for j in 1:size(xout,2)
-        for i in 1:size(xout,1)
-            xout[i,j] = f(view(x,((i-1)*fac+1):min(size(x,1),(i*fac)),((j-1)*fac+1):min(size(x,2),(j*fac))))
+    for j in axes(xout,2)
+        for i in axes(xout,1)
+            xview = ((i-1)*fac+1):min(size(x,1),(i*fac))
+            yview = ((j-1)*fac+1):min(size(x,2),(j*fac))
+            #@show xview, yview, size(xout), fac, size(x)
+            xout[i,j] = f(view(x,xview,yview))
         end
     end
 end
@@ -31,11 +34,11 @@ This is an optimization which for functions like median might lead to misleading
 """ 
 function all_pyramids!(xout,x,recursive,f)
     xnow = x
-    for i in 1:length(xout)
-        @debug "Pyramidnumber $i"
-        aggregate_by_factor(xout[i],xnow,f)
+    for xcur in xout
+        #@show "Pyramidnumber $i"
+        aggregate_by_factor(xcur,xnow,f)
         if recursive
-            xnow = xout[i]
+            xnow = xcur
         end
     end
 end
