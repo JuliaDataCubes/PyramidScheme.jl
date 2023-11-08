@@ -7,6 +7,7 @@ using DimensionalData: rebuild, dims
 using GLMakie
 using Rasters
 using Extents
+using Proj
 
 using Statistics
 
@@ -66,8 +67,8 @@ Fill the pyramids generated from the `data` with the aggregation function `func`
 This is an optimization which for functions like median might lead to misleading results.
 """
 function fill_pyramids(data, outputs,func,recursive;kwargs...)
-
     n_level = length(outputs)
+    #@show n_level
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
@@ -184,9 +185,9 @@ Internal function to select the raster data that should be plotted on screen.
 """
 function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
     imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
-    @show imsize
+    #@show imsize
     n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
-    @show n_agg
+    #@show n_agg
     pyramids[n_agg][ext]
 end
 
@@ -209,24 +210,43 @@ function plotpyramids(pyramids;colorbar=true, kwargs...)
     fig, ax, hmap
 end
 
-function plotpyramids!(ax, pyramids;kwargs...)
+
+
+function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857), kwargs...)
     data = Observable{Raster}(pyramids[end])
     rasext = extent(pyramids[end])
     on(ax.finallimits) do limits
-        @show limits
         limext = Extents.extent(limits)
-        if Extents.intersects(rasext, limext)
-            data.val = selectlevel(pyramids, limext)
+        # Compute limit in raster projection
+        #todataproj = Proj.Transformation(plotcrs, rastercrs)
+        #@show plotcrs, rastercrs
+        trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
+        datalimit = trans_bounds(trans, limext)
+        #datalimit = limext
+        #@show datalimit
+        if Extents.intersects(rasext, datalimit)
+            rasdata = selectlevel(pyramids, datalimit)
+            # Project selected data to plotcrs
+            #data.val = rasdata
+            data.val = Rasters.resample(rasdata, crs="EPSG:3857")
         end
         notify(data)
     end
-    @show size(data.val)
     
     hmap = heatmap!(ax, data; interpolate=false, kwargs...)#, colorrange=(-8, -1))
     #Colorbar(fig[1,2], hmap)
     #ax.autolimitaspect = 1
     #fig, ax, hmap
     
+end
+
+function trans_bounds(
+    trans::Proj.Transformation,
+    bbox::Extent,
+    densify_pts::Integer = 21,
+)::Extent
+    xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
+    return Extent(X = xlims, Y = ylims)
 end
 #f = ESALCMode()
 
