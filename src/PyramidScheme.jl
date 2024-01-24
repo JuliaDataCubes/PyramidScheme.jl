@@ -23,7 +23,6 @@ function aggregate_by_factor(xout,x,f)
         for i in axes(xout,1)
             xview = ((i-1)*fac+1):min(size(x,1),(i*fac))
             yview = ((j-1)*fac+1):min(size(x,2),(j*fac))
-            #@show xview, yview, size(xout), fac, size(x)
             xout[i,j] = f(view(x,xview,yview))
         end
     end
@@ -40,7 +39,6 @@ This is an optimization which for functions like median might lead to misleading
 function all_pyramids!(xout,x,recursive,f)
     xnow = x
     for xcur in xout
-        #@show "Pyramidnumber $i"
         aggregate_by_factor(xcur,xnow,f)
         if recursive
             xnow = xcur
@@ -68,7 +66,6 @@ This is an optimization which for functions like median might lead to misleading
 """
 function fill_pyramids(data, outputs,func,recursive;kwargs...)
     n_level = length(outputs)
-    #@show n_level
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
@@ -80,7 +77,6 @@ function fill_pyramids(data, outputs,func,recursive;kwargs...)
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
-    #@show op
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
     r = DiskArrayEngine.LocalRunner(op,lr,outputs;kwargs...)
@@ -128,10 +124,6 @@ compute_nlevels(data, tilesize=1024) = ceil(Int,log2(maximum(size(data))/tilesiz
 
 agg_axis(x,n) = rebuild(x, mean.(Iterators.partition(x,n)))
 
-#pyramid_sizes(n_level) =  [ceil.(Int, size(testdata) ./ 2^i) for i in 1:n_level]
-#pyramid_axes(n_level) = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-
-#t = eltype(testdata)
 
 """
     gen_output(t,s)
@@ -164,7 +156,6 @@ This returns the data of the pyramids and the dimension values of the aggregated
 """
 function getpyramids(reducefunc, ras;recursive=true)
     input_axes = (dims(ras))
-    #testdata = arr.arrays["layer"]
     n_level = compute_nlevels(ras)
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
@@ -172,7 +163,6 @@ function getpyramids(reducefunc, ras;recursive=true)
     outmin = output_arrays(pyramid_sizes, Float32)
     fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
 
-    #[ras, Raster.(outmin, pyramid_axes)...];
     outmin, pyramid_axes
 end
 
@@ -185,9 +175,7 @@ Internal function to select the raster data that should be plotted on screen.
 """
 function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
     imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
-    #@show imsize
     n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
-    #@show n_agg
     pyramids[n_agg][ext]
 end
 
@@ -218,27 +206,18 @@ function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
         # Compute limit in raster projection
-        #todataproj = Proj.Transformation(plotcrs, rastercrs)
-        #@show plotcrs, rastercrs
         trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
         datalimit = trans_bounds(trans, limext)
-        #datalimit = limext
-        #@show datalimit
+
         if Extents.intersects(rasext, datalimit)
             rasdata = selectlevel(pyramids, datalimit)
             # Project selected data to plotcrs
-            #data.val = rasdata
-            data.val = Rasters.resample(rasdata, crs="EPSG:3857")
+            data.val = Rasters.resample(rasdata, crs=plotcrs)
         end
         notify(data)
     end
     
-    hmap = heatmap!(ax, data; interpolate=false, kwargs...)#, colorrange=(-8, -1))
-    #Colorbar(fig[1,2], hmap)
-    #ax.autolimitaspect = 1
-    #fig, ax, hmap
-    
-end
+    hmap = heatmap!(ax, data; interpolate=false, kwargs...)
 
 function trans_bounds(
     trans::Proj.Transformation,
@@ -248,90 +227,5 @@ function trans_bounds(
     xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
     return Extent(X = xlims, Y = ylims)
 end
-#f = ESALCMode()
-
-#fill_pyramids(testdata,output_arrays,f,true)
-
-
-#Now some plotting code
-#colmap = similar(colm,256)
-#for i in 1:length(flv)
-#    colmap[Int(flv[i])+1] = colm[i]
-#end
-#size(testdata)
-
-
-#=
-function plot_im(data,colmap,cent,imsize;target_imsize = (1024,512))
-    n_agg = ceil(Int,minimum(log2.(imsize./target_imsize)))+1
-    n_agg = clamp(n_agg,1,length(data))
-    @show n_agg
-    b1 = (cent .- imsize .÷  2 .+1) .÷ (2^(n_agg-1))
-    b2 = (cent .+ imsize .÷ 2) .÷ (2^(n_agg-1))
-    datanow = data[n_agg]
-    snow = size(datanow)
-    b1c = clamp.(b1,1,snow)
-    b2c = clamp.(b2,1,snow)
-    inds_intern = range.(b1c,b2c)
-    x = data[n_agg][inds_intern...]
-    permutedims(map(x) do ix
-        colmap[Int(ix)+1]
-    end)
-end
-
-
-mutable struct Viewer
-    data
-    colmap
-    center
-    zoom
-end
-zoom_out(v::Viewer) = v.zoom = v.zoom*1.3
-zoom_in(v::Viewer) = v.zoom = v.zoom/1.3
-move_right(v::Viewer) = v.center = round.(Int,(v.center[1]+300*v.zoom,v.center[2]))
-move_left(v::Viewer) = v.center = round.(Int,(v.center[1]-300*v.zoom,v.center[2]))
-move_down(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]+300*v.zoom))
-move_up(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]-300*v.zoom))
-function doplot(v::Viewer)
-    target_imsize = (1024,512)
-    imsize = round.(Int,v.zoom .*target_imsize)
-    plot_im(v.data,v.colmap, v.center,imsize)
-end
-
-function apply_input(v,x)
-    if x=='a'
-        move_left(v)
-    elseif x == 'd'
-        move_right(v)
-    elseif x == 'w'
-        move_up(v)
-    elseif x == 's'
-        move_down(v)
-    elseif x == 'k'
-        zoom_in(v)
-    elseif x == 'l'
-        zoom_out(v)
-    else 
-        return 1
-    end
-    0
-end
-
-data = [testdata,output_arrays...]
-
-v = Viewer(data,colmap,(80000,30000),1.0)
-
-while true
-    inp = readline(stdin)
-    isempty(inp) && break
-    r = apply_input(v,first(inp))
-    if r == 1
-        break
-    else
-        display(doplot(v))
-    end
-end
-
-=#
 
 end
