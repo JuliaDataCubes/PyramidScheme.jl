@@ -212,7 +212,7 @@ function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857
         if Extents.intersects(rasext, datalimit)
             rasdata = selectlevel(pyramids, datalimit)
             # Project selected data to plotcrs
-            data.val = Rasters.resample(rasdata, crs="EPSG:3857")
+            data.val = Rasters.resample(rasdata, crs=plotcrs)
         end
         notify(data)
     end
