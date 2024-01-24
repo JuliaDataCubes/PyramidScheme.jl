@@ -234,10 +234,6 @@ function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857
     end
     
     hmap = heatmap!(ax, data; interpolate=false, kwargs...)#, colorrange=(-8, -1))
-    #Colorbar(fig[1,2], hmap)
-    #ax.autolimitaspect = 1
-    #fig, ax, hmap
-    
 end
 
 function trans_bounds(
@@ -248,90 +244,5 @@ function trans_bounds(
     xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
     return Extent(X = xlims, Y = ylims)
 end
-#f = ESALCMode()
-
-#fill_pyramids(testdata,output_arrays,f,true)
-
-
-#Now some plotting code
-#colmap = similar(colm,256)
-#for i in 1:length(flv)
-#    colmap[Int(flv[i])+1] = colm[i]
-#end
-#size(testdata)
-
-
-#=
-function plot_im(data,colmap,cent,imsize;target_imsize = (1024,512))
-    n_agg = ceil(Int,minimum(log2.(imsize./target_imsize)))+1
-    n_agg = clamp(n_agg,1,length(data))
-    @show n_agg
-    b1 = (cent .- imsize .÷  2 .+1) .÷ (2^(n_agg-1))
-    b2 = (cent .+ imsize .÷ 2) .÷ (2^(n_agg-1))
-    datanow = data[n_agg]
-    snow = size(datanow)
-    b1c = clamp.(b1,1,snow)
-    b2c = clamp.(b2,1,snow)
-    inds_intern = range.(b1c,b2c)
-    x = data[n_agg][inds_intern...]
-    permutedims(map(x) do ix
-        colmap[Int(ix)+1]
-    end)
-end
-
-
-mutable struct Viewer
-    data
-    colmap
-    center
-    zoom
-end
-zoom_out(v::Viewer) = v.zoom = v.zoom*1.3
-zoom_in(v::Viewer) = v.zoom = v.zoom/1.3
-move_right(v::Viewer) = v.center = round.(Int,(v.center[1]+300*v.zoom,v.center[2]))
-move_left(v::Viewer) = v.center = round.(Int,(v.center[1]-300*v.zoom,v.center[2]))
-move_down(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]+300*v.zoom))
-move_up(v::Viewer) = v.center = round.(Int,(v.center[1],v.center[2]-300*v.zoom))
-function doplot(v::Viewer)
-    target_imsize = (1024,512)
-    imsize = round.(Int,v.zoom .*target_imsize)
-    plot_im(v.data,v.colmap, v.center,imsize)
-end
-
-function apply_input(v,x)
-    if x=='a'
-        move_left(v)
-    elseif x == 'd'
-        move_right(v)
-    elseif x == 'w'
-        move_up(v)
-    elseif x == 's'
-        move_down(v)
-    elseif x == 'k'
-        zoom_in(v)
-    elseif x == 'l'
-        zoom_out(v)
-    else 
-        return 1
-    end
-    0
-end
-
-data = [testdata,output_arrays...]
-
-v = Viewer(data,colmap,(80000,30000),1.0)
-
-while true
-    inp = readline(stdin)
-    isempty(inp) && break
-    r = apply_input(v,first(inp))
-    if r == 1
-        break
-    else
-        display(doplot(v))
-    end
-end
-
-=#
 
 end
