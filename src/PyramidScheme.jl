@@ -90,7 +90,9 @@ end
 struct ESALCMode
     counts::Vector{Vector{Int}}
 end
+
 ESALCMode() = ESALCMode([zeros(Int,256) for _ in 1:Threads.nthreads()])
+
 function (f::ESALCMode)(x)
     cv = f.counts[Threads.threadid()]
     fill!(cv,0)
@@ -120,7 +122,7 @@ end
 
 Compute the number of levels for the aggregation based on the size of `data`.
 """
-compute_nlevels(data, tilesize=1024) = ceil(Int,log2(maximum(size(data))/tilesize))
+compute_nlevels(data, tilesize=1024) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
 agg_axis(x,n) = rebuild(x, mean.(Iterators.partition(x,n)))
 
@@ -157,6 +159,10 @@ This returns the data of the pyramids and the dimension values of the aggregated
 function getpyramids(reducefunc, ras;recursive=true)
     input_axes = (dims(ras))
     n_level = compute_nlevels(ras)
+    if iszero(n_level)
+        @info "Array is smaller than the tilesize no pyramids are computed"
+        [ras], [dims(ras)]
+    end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
 
@@ -218,6 +224,7 @@ function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857
     end
     
     hmap = heatmap!(ax, data; interpolate=false, kwargs...)
+end
 
 function trans_bounds(
     trans::Proj.Transformation,
