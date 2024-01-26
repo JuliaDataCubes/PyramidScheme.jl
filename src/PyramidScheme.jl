@@ -4,10 +4,11 @@ using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray
 using DiskArrays: DiskArrays
 using Zarr: zcreate
 using DimensionalData: DimensionalData as DD
-using GLMakie
 using Rasters
 using Extents
 using Proj
+using Makie: Axis, Colorbar, DataAspect, Figure, Observable, on, heatmap!
+import MakieCore: plot, plot!
 
 using Statistics
 
@@ -31,6 +32,8 @@ end
 # refdims
 # name
 
+levels(pyramid::Pyramid) = pyramid.levels
+nlevels(pyramid::Pyramid) = length(levels(pyramid))
 Base.parent(pyramid::Pyramid) = pyramid.base
 Base.size(pyramid::Pyramid) = size(parent(pyramid))
 
@@ -235,24 +238,25 @@ Internal function to select the raster data that should be plotted on screen.
 `ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
 `target_imsize` is the target size of the output data that should be plotted.
 """
-function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
+function selectlevel(pyramid, ext, resolution=10;target_imsize=(1024, 512))
     imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
-    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
-    pyramids[n_agg][ext]
+    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),nlevels(pyramid))
+    levels(pyramid)[n_agg][ext]
 end
 
 
 """
-    plotpyramids(pyramids)
-A helper function to plot a dataset of pyramids.
-At the moment pyramids is expected to be a list of pyramids with the same extent. 
+    plot(pyramids)
+Plot a Pyramid. 
+This will plot the coarsest resolution level at the beginning and will plot higher resolutions after zooming into the plot.
+This is expected to be used with interactive Makie backends.
 """
-function plotpyramids(pyramidlevels;colorbar=true, kwargs...)
+function plot(pyramid::Pyramid;colorbar=true, kwargs...)
     #This should be converted into a proper recipe for Makie but this would depend on a pyramid type.
     fig = Figure()
-    lon, lat = dims(pyramidlevels[1])
+    lon, lat = dims(parent(pyramid))
     ax = Axis(fig[1,1], limits=(extrema(lon), extrema(lat)), aspect=DataAspect())
-    hmap = plotpyramids!(ax, pyramidlevels;kwargs...)
+    hmap = plot!(ax, pyramid;kwargs...)
     if colorbar
         Colorbar(fig[1,2], hmap)
     end
@@ -262,19 +266,20 @@ end
 
 
 
-function plotpyramids!(ax, pyramidlevels;rastercrs=crs(pyramidlevels[1]),plotcrs=EPSG(3857), kwargs...)
-    data = Observable{Raster}(pyramidlevels[end])
-    rasext = extent(pyramidlevels[end])
+function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)[1]),plotcrs=EPSG(3857), kwargs...)
+    data = Observable{AbstractDimArray}(levels(pyramid)[end])
+    rasext = extent(pyramid)
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
         # Compute limit in raster projection
-        trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
-        datalimit = trans_bounds(trans, limext)
-
+        #trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
+        #datalimit = trans_bounds(trans, limext)
+        datalimit = limext
         if Extents.intersects(rasext, datalimit)
-            rasdata = selectlevel(pyramidlevels, datalimit)
+            rasdata = selectlevel(pyramid, datalimit)
             # Project selected data to plotcrs
-            data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
+            #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
+            data.val = rasdata
         end
         notify(data)
     end
