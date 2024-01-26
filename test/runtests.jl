@@ -1,14 +1,48 @@
 using PyramidScheme:PyramidScheme as PS
 using Test
-using Zarr
-using ArchGDAL
+using DimensionalData
+#using Zarr
+#using ArchGDAL
 #using NetCDF
-using YAXArrayBase
-using Rasters
-using Statistics
-using YAXArrays
-using Extents
-using Tyler
+#using YAXArrayBase
+#using Rasters
+#using Statistics
+#using YAXArrays
+#using Extents
+
+
+@testset "Pyramid" begin
+    using DimensionalData
+    using PyramidScheme: PyramidScheme as PS
+    data = rand(2000,2000)
+    dd = DimArray(data, (X(1:2000), Y(1:2000)))
+    pyramid = PS.Pyramid(dd)
+    @test PS.nlevels(pyramid) == 2
+    subpyramid = pyramid[X=1..10, Y=1..10]
+    @test subpyramid isa PS.Pyramid
+    @test size(subpyramid) == (10,10)
+    @test parent(subpyramid) == data[1:10,1:10]
+end
+@testset "Helper functions" begin
+    @test PS.compute_nlevels(zeros(1000)) == 0
+    @test PS.compute_nlevels(zeros(1000,1025)) == 1
+    @test PS.compute_nlevels(zeros(10000, 8000)) == 4
+end
+
+@testset "User facing functions" begin
+    data = rand(256,256)
+    dd = DimArray(data, (X(1:256), Y(1:256)))
+    pyramid = Pyramid(dd, tilesize=8)
+    @test pyr[1] == dd
+    @test pyr isa AbstractDimArray
+
+    pyramid[level=1]
+    @test plot(pyr)
+    
+
+end
+
+
 #testdata = Float32[sin(x)*cos(y) for x in range(0,15,3000), y in range(0,10,2000)];
 cd("test")
 inpath = "/home/fcremer/Documents/rqa_cscale/data/ForestType/2017_FOREST-CLASSES_EU010M_E048N018T1.tif"
