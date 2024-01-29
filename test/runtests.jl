@@ -1,6 +1,7 @@
 using PyramidScheme:PyramidScheme as PS
 using Test
 using DimensionalData
+using CairoMakie: plot
 
 @testset "Pyramid" begin
     using DimensionalData
