@@ -3,14 +3,73 @@ module PyramidScheme
 using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
 using DiskArrays: DiskArrays
 using Zarr: zcreate
-using DimensionalData: rebuild, dims
-using GLMakie
+using DimensionalData: DimensionalData as DD
 using Rasters
 using Extents
 using Proj
+using Makie: Axis, Colorbar, DataAspect, Figure, Observable, on, heatmap!
+import MakieCore: plot, plot!
 
 using Statistics
 
+
+
+"""
+    Pyramid
+A Pyramid will act as a DimArray on the highest resolution, but subsetting will return another Pyramid.
+"""
+struct Pyramid{T,N,D,A,B<:AbstractDimArray{T,N,D,A},L} <: AbstractDimArray{T,N,D,A}
+    base::B
+    levels::L
+end
+
+function Pyramid(data::AbstractDimArray)
+    pyrdata, pyraxs = getpyramids(mean ∘ skipmissing, data, recursive=false)
+    levels = DimArray.(pyrdata, pyraxs)
+    Pyramid(data, levels)
+end
+
+# refdims
+# name
+
+levels(pyramid::Pyramid) = pyramid.levels
+nlevels(pyramid::Pyramid) = length(levels(pyramid))
+Base.parent(pyramid::Pyramid) = pyramid.base
+Base.size(pyramid::Pyramid) = size(parent(pyramid))
+
+DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
+DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
+DD.dims(pyramid::Pyramid) = DD.dims(parent(pyramid))
+
+@inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
+    Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, metadata(A)), A.levels)
+end
+
+@inline DD.rebuild(A::Pyramid; kw...) = Pyramid(DD.rebuild(parent(A); kw...), A.levels)
+
+
+@inline function DD.rebuildsliced(f::Function, A::Pyramid, data::AbstractArray, I::Tuple, name=DD.name(A))
+    newbase = DD.rebuild(parent(A), parent(data), DD.slicedims(f, A, I)..., name)
+    newlevels = map(enumerate(A.levels)) do (z, level)
+        Ilevel =  levelindex(z, I)
+        leveldata = f(parent(level), Ilevel...)
+        DD.rebuild(level, leveldata, DD.slicedims(f, level, Ilevel)..., name)
+        
+    end
+    Pyramid(newbase, newlevels)
+end
+
+"""
+    levelindex(z, i)
+Internal function.
+# Extended help
+
+Compute the index into the level `z` from the index i by shifting by a power of two on the Integer level
+"""
+levelindex(z, i::Integer) = (i - 1) >> z +1
+# TODO: This should be also done generically for OrdinalRanges
+levelindex(z, i::AbstractUnitRange) = levelindex(z, first(i)):levelindex(z, last(i))
+levelindex(z, I::Tuple) = map(i -> levelindex(z, i), I)
 """
     aggregate_by_factor(xout, x, f)
 
@@ -90,7 +149,9 @@ end
 struct ESALCMode
     counts::Vector{Vector{Int}}
 end
+
 ESALCMode() = ESALCMode([zeros(Int,256) for _ in 1:Threads.nthreads()])
+
 function (f::ESALCMode)(x)
     cv = f.counts[Threads.threadid()]
     fill!(cv,0)
@@ -120,9 +181,9 @@ end
 
 Compute the number of levels for the aggregation based on the size of `data`.
 """
-compute_nlevels(data, tilesize=1024) = ceil(Int,log2(maximum(size(data))/tilesize))
+compute_nlevels(data, tilesize=1024) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
-agg_axis(x,n) = rebuild(x, mean.(Iterators.partition(x,n)))
+agg_axis(x,n) = DD.rebuild(x, mean.(Iterators.partition(x,n)))
 
 
 """
@@ -157,6 +218,10 @@ This returns the data of the pyramids and the dimension values of the aggregated
 function getpyramids(reducefunc, ras;recursive=true)
     input_axes = (dims(ras))
     n_level = compute_nlevels(ras)
+    if iszero(n_level)
+        @info "Array is smaller than the tilesize no pyramids are computed"
+        [ras], [dims(ras)]
+    end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
 
@@ -173,24 +238,25 @@ Internal function to select the raster data that should be plotted on screen.
 `ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
 `target_imsize` is the target size of the output data that should be plotted.
 """
-function selectlevel(pyramids, ext, resolution=10;target_imsize=(1024, 512))
+function selectlevel(pyramid, ext, resolution=10;target_imsize=(1024, 512))
     imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
-    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),length(pyramids))
-    pyramids[n_agg][ext]
+    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),nlevels(pyramid))
+    levels(pyramid)[n_agg][ext]
 end
 
 
 """
-    plotpyramids(pyramids)
-A helper function to plot a dataset of pyramids.
-At the moment pyramids is expected to be a list of pyramids with the same extent. 
+    plot(pyramids)
+Plot a Pyramid. 
+This will plot the coarsest resolution level at the beginning and will plot higher resolutions after zooming into the plot.
+This is expected to be used with interactive Makie backends.
 """
-function plotpyramids(pyramids;colorbar=true, kwargs...)
+function plot(pyramid::Pyramid;colorbar=true, kwargs...)
     #This should be converted into a proper recipe for Makie but this would depend on a pyramid type.
     fig = Figure()
-    lon, lat = dims(pyramids[1])
+    lon, lat = dims(parent(pyramid))
     ax = Axis(fig[1,1], limits=(extrema(lon), extrema(lat)), aspect=DataAspect())
-    hmap = plotpyramids!(ax, pyramids;kwargs...)
+    hmap = plot!(ax, pyramid;kwargs...)
     if colorbar
         Colorbar(fig[1,2], hmap)
     end
@@ -200,24 +266,25 @@ end
 
 
 
-function plotpyramids!(ax, pyramids;rastercrs=crs(pyramids[1]),plotcrs=EPSG(3857), kwargs...)
-    data = Observable{Raster}(pyramids[end])
-    rasext = extent(pyramids[end])
+function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)[1]),plotcrs=EPSG(3857), kwargs...)
+    data = Observable{AbstractDimArray}(levels(pyramid)[end])
+    rasext = extent(pyramid)
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
         # Compute limit in raster projection
-        trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
-        datalimit = trans_bounds(trans, limext)
-
+        #trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
+        #datalimit = trans_bounds(trans, limext)
+        datalimit = limext
         if Extents.intersects(rasext, datalimit)
-            rasdata = selectlevel(pyramids, datalimit)
+            rasdata = selectlevel(pyramid, datalimit)
             # Project selected data to plotcrs
-            data.val = Rasters.resample(rasdata, crs=plotcrs)
+            #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
+            data.val = rasdata
         end
         notify(data)
     end
-    
     hmap = heatmap!(ax, data; interpolate=false, kwargs...)
+end
 
 function trans_bounds(
     trans::Proj.Transformation,
