@@ -4,7 +4,6 @@ authors = ["Felix Cremer <fcremer@bgc-jena.mpg.de> and contributors"]
 version = "0.1.0"
 
 [deps]
-ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 DiskArrayEngine = "2d4b2e14-ccd6-4284-b8b0-2378ace7c126"
 DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
@@ -36,3 +35,6 @@ YAXArrayBase = "90b8fcef-0c2d-428d-9c56-5f86629e9d14"
 
 [targets]
 test = ["ArchGDAL", "Colors", "Extents", "Makie", "Rasters", "Statistics", "Test", "YAXArrayBase"]
+
+[weakdeps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"

@@ -266,8 +266,10 @@ end
 
 
 
-function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)[1]),plotcrs=EPSG(3857), kwargs...)
+function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
+    @show size(pyramid)
     data = Observable{AbstractDimArray}(levels(pyramid)[end])
+    @show typeof(data[])
     rasext = extent(pyramid)
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
