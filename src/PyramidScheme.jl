@@ -183,7 +183,7 @@ Compute the number of levels for the aggregation based on the size of `data`.
 """
 compute_nlevels(data, tilesize=1024) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
-agg_axis(x,n) = DD.rebuild(x, mean.(Iterators.partition(x,n)))
+agg_axis(d,n) = DD.rebuild(d, LinRange(first(d), last(d), cld(length(d), n)))
 
 
 """

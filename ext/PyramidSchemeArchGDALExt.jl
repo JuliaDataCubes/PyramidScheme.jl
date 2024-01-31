@@ -10,9 +10,7 @@ function Pyramid(path::AbstractString)
     numlevels = AG.noverview(band)
     dbase = dims(base)
     pyrlevels = [Raster(AG.getoverview(band, n), PS.agg_axis.(dims(base), 2^(n+1))) for n in 0:numlevels-1]
-    PS.Pyramid(base, levels)
+    PS.Pyramid(base, pyrlevels)
 end
-
-
 
 end
