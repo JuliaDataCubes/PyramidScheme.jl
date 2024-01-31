@@ -21,6 +21,7 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [compat]
 julia = "1"
+DiskArrayEngine = "0.1.1"
 
 [extras]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
