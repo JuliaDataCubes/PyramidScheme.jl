@@ -5,7 +5,7 @@ using DimensionalData
 @testset "Pyramid" begin
     using DimensionalData
     using PyramidScheme: PyramidScheme as PS
-    data = rand(2000,2000)
+    data = zeros(2000,2000)
     dd = DimArray(data, (X(1:2000), Y(1:2000)))
     pyramid = PS.Pyramid(dd)
     #@test PS.nlevels(pyramid) == 2
@@ -26,10 +26,10 @@ end
     using PyramidScheme: PyramidScheme as PS
     using Rasters
 
-    path = "test/data/SIG0_20150102T053302__VH_D066_E048N018T3_EU020M_V1M1R1_S1AIWGRDH_TUWIEN.tif"
+    path = "test/data/pyramidmiddle.tif"
     #ras = Raster(path, lazy=true)
     pyr =PS.Pyramid(path)
     @test pyr isa PS.Pyramid
-    
-
+    plot(pyr)
+    @test PS.nlevels(pyr) == 3
 end

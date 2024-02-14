@@ -1,9 +1,9 @@
 module PyramidSchemeArchGDALExt
 using ArchGDAL: ArchGDAL as AG
-using PyramdScheme: PyramidScheme as PS
+using PyramidScheme: PyramidScheme as PS
 using Rasters
 
-function Pyramid(path::AbstractString)
+function PS.Pyramid(path::AbstractString)
     base = Raster(path, lazy=true)
     agbase = AG.readraster(path)
     band = AG.getband(agbase,1)

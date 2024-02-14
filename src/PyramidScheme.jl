@@ -4,10 +4,9 @@ using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray
 using DiskArrays: DiskArrays
 using Zarr: zcreate
 using DimensionalData: DimensionalData as DD
-using Rasters
 using Extents
 using Proj
-using Makie: Axis, Colorbar, DataAspect, Figure, Observable, on, heatmap!
+using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, on, heatmap!
 import MakieCore: plot, plot!
 
 using Statistics
@@ -18,21 +17,29 @@ using Statistics
     Pyramid
 A Pyramid will act as a DimArray on the highest resolution, but subsetting will return another Pyramid.
 """
-struct Pyramid{T,N,D,A,B<:AbstractDimArray{T,N,D,A},L} <: AbstractDimArray{T,N,D,A}
+struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L} <: DD.AbstractDimArray{T,N,D,A}
     base::B
     levels::L
 end
 
-function Pyramid(data::AbstractDimArray)
+function Pyramid(data::DD.AbstractDimArray)
     pyrdata, pyraxs = getpyramids(mean ∘ skipmissing, data, recursive=false)
-    levels = DimArray.(pyrdata, pyraxs)
+    levels = DD.DimArray.(pyrdata, pyraxs)
     Pyramid(data, levels)
 end
 
 # refdims
 # name
 
-levels(pyramid::Pyramid) = pyramid.levels
+"""
+    levels(pyramid::Pyramid)
+Return all levels of the `pyramid`. These are order from the base to the coarsest aggregation.
+"""
+levels(pyramid::Pyramid) = [pyramid.base, pyramid.levels...]
+"""
+    nlevels(pyramid)
+Return the number of levels of the `pyramid`
+"""
 nlevels(pyramid::Pyramid) = length(levels(pyramid))
 Base.parent(pyramid::Pyramid) = pyramid.base
 Base.size(pyramid::Pyramid) = size(parent(pyramid))
@@ -216,7 +223,7 @@ Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
 function getpyramids(reducefunc, ras;recursive=true)
-    input_axes = (dims(ras))
+    input_axes = DD.dims(ras)
     n_level = compute_nlevels(ras)
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
@@ -238,9 +245,16 @@ Internal function to select the raster data that should be plotted on screen.
 `ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
 `target_imsize` is the target size of the output data that should be plotted.
 """
-function selectlevel(pyramid, ext, resolution=10;target_imsize=(1024, 512))
-    imsize = (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]) ./ resolution
-    n_agg = min(max(ceil(Int,minimum(log2.(imsize ./ target_imsize))) + 1,1),nlevels(pyramid))
+function selectlevel(pyramid, ext;target_imsize=(1024, 512))
+    # TODO automatically set the target_imsize
+    imsize = map(keys(ext)) do bb
+        resolution = abs(step(DD.dims(pyramid, bb)))
+
+        (ext[bb][2] - ext[bb][1]) / resolution
+    end
+    dimlevels = log2.(imsize ./ target_imsize)
+    minlevel = maximum(dimlevels)
+    n_agg = min(max(ceil(Int,minlevel) + 1,1),nlevels(pyramid))
     levels(pyramid)[n_agg][ext]
 end
 
@@ -254,22 +268,20 @@ This is expected to be used with interactive Makie backends.
 function plot(pyramid::Pyramid;colorbar=true, kwargs...)
     #This should be converted into a proper recipe for Makie but this would depend on a pyramid type.
     fig = Figure()
-    lon, lat = dims(parent(pyramid))
+    lon, lat = DD.dims(parent(pyramid))
     ax = Axis(fig[1,1], limits=(extrema(lon), extrema(lat)), aspect=DataAspect())
     hmap = plot!(ax, pyramid;kwargs...)
     if colorbar
         Colorbar(fig[1,2], hmap)
     end
     ax.autolimitaspect = 1
-    fig, ax, hmap
+    FigureAxisPlot(fig, ax, hmap)
 end
 
 
 
-function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
-    @show size(pyramid)
-    data = Observable{AbstractDimArray}(levels(pyramid)[end])
-    @show typeof(data[])
+function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
+    data = Observable{DD.AbstractDimArray}(levels(pyramid)[end])
     rasext = extent(pyramid)
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
@@ -279,6 +291,7 @@ function plot!(ax, pyramid::Pyramid;rastercrs=crs(parent(pyramid)),plotcrs=EPSG(
         datalimit = limext
         if Extents.intersects(rasext, datalimit)
             rasdata = selectlevel(pyramid, datalimit)
+            #@show rasdata
             # Project selected data to plotcrs
             #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
             data.val = rasdata
