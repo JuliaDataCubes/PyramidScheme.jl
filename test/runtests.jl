@@ -32,4 +32,6 @@ end
     @test pyr isa PS.Pyramid
     plot(pyr)
     @test PS.nlevels(pyr) == 3
+    sub = pyr[1:10,1:10]
+    @test sub isa Pyramid
 end
