@@ -27,7 +27,7 @@ end
     using PyramidScheme: PyramidScheme as PS
     using Rasters
 
-    path = "test/data/pyramidmiddle.tif"
+    path = "data/pyramidmiddle.tif"
     #ras = Raster(path, lazy=true)
     pyr =PS.Pyramid(path)
     @test pyr isa PS.Pyramid
