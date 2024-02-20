@@ -49,7 +49,7 @@ DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
 DD.dims(pyramid::Pyramid) = DD.dims(parent(pyramid))
 
 @inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
-    Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, metadata(A)), A.levels)
+    Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels)
 end
 
 @inline DD.rebuild(A::Pyramid; kw...) = Pyramid(DD.rebuild(parent(A); kw...), A.levels)
@@ -298,7 +298,7 @@ function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),
         end
         notify(data)
     end
-    hmap = heatmap!(ax, data; interpolate=false, kwargs...)
+    hmap = plot!(ax, data; interpolate=false, kwargs...)
 end
 
 function trans_bounds(
