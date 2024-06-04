@@ -66,6 +66,15 @@ end
     Pyramid(newbase, newlevels)
 end
 
+function DD.show_after(io::IO, mime, A::Pyramid)
+    blockwidth = get(io, :blockwidth, 0)
+    DD.print_block_separator(io, "pyramidlevels", blockwidth)
+    println(io, "  Number of levels: $(nlevels(A)) ")
+    for l in levels(A)
+        println(io, "   ", size(l))
+    end
+    DD.print_block_close(io, blockwidth)
+end
 """
     levelindex(z, i)
 Internal function.
