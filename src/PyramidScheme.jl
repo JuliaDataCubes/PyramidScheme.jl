@@ -39,6 +39,16 @@ function Pyramid(data::DD.AbstractDimArray)
     Pyramid(data, levels)
 end
 
+Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
+function Pyramid(path::AbstractString, backend)
+    #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
+    backend isa YAB.ZarrDataset || error("does only work for Zarr data")
+
+    base = Cube(path)[Ti=1] # This getindex should be unnecessary and I should rather fix my data on disk
+    levavail = extrema(parse.(Int,readdir(path)[contains.(readdir(path), r"\d")]))
+    clevels = [Cube(joinpath(path, string(l))) for l in 1:last(levavail)]
+    Pyramid(base, clevels, Dict())
+end
 # refdims
 # name
 
