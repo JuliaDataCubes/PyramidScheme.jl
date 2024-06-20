@@ -27,7 +27,7 @@ using OffsetArrays
 
 using Statistics
 
-
+export Pyramid, buildpyramids
 
 """
     Pyramid
