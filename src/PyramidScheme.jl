@@ -1,3 +1,10 @@
+"""
+PyramidScheme is a package to generate and work with Pyramids. 
+A pyramid is a data structure that holds a two dimensional base array and corresponding aggregations,
+which can be used for interactive plotting and analysis.
+The main entry point of the package is the `Pyramid` type for the use of already available pyramids
+and the `buildpyramids` function to generate the aggregation layers for an existing dataset.
+"""
 module PyramidScheme
 
 using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
@@ -15,11 +22,15 @@ using Statistics
 
 """
     Pyramid
-A Pyramid will act as a DimArray on the highest resolution, but subsetting will return another Pyramid.
+A Pyramid will act as a DimArray with the data of the highest resolution,
+but subsetting will return another Pyramid.
 """
-struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L} <: DD.AbstractDimArray{T,N,D,A}
+struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimArray{T,N,D,A}
+    "Highest resolution data of the pyramid"
     base::B
+    "Aggregation layers of the `base` layer."
     levels::L
+    "Metadata that describes the aggregation step if available"
 end
 
 function Pyramid(data::DD.AbstractDimArray)
@@ -87,7 +98,12 @@ levelindex(z, i::Integer) = (i - 1) >> z +1
 levelindex(z, i::AbstractUnitRange) = levelindex(z, first(i)):levelindex(z, last(i))
 levelindex(z, I::Tuple) = map(i -> levelindex(z, i), I)
 """
+Internal function
+
+# Extended help
+
     aggregate_by_factor(xout, x, f)
+
 
 Aggregate the data `x` using the function `f` and store the results in `xout`.
 This function is used as the inner function for the DiskArrayEngine call.
@@ -161,6 +177,7 @@ end
 """
     ESALCMode(counts)
 
+Struct for more efficient handling of aggregating categorical land cover data.
 """
 struct ESALCMode
     counts::Vector{Vector{Int}}
