@@ -5,7 +5,10 @@ makedocs(
     format = Documenter.HTML(; prettyurls = get(ENV, "CI", nothing) == "true"),
     authors = "Felix Cremer, Fabian Gans",
     sitename = "PyramidScheme.jl",
-    pages = Any["index.md"]
+    pages = Any[
+            "index.md",
+            "interface.md",
+    ]
     # strict = true,
     # clean = true,
     # checkdocs = :exports,

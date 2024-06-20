@@ -4,6 +4,8 @@ PyramidScheme.jl is a package to easily and efficiently compute pyramids of a gi
 It uses DiskArrayEngine.jl as the computational backend.
 The pyramids can then be used to interactively explore the data.
 
+The long term aim of PyramidScheme.jl is to enable computing based on the layers of the pyramid to enable a more interactive exploration of computations based of pyramided datasets. 
+
 
 
 ## Usage
