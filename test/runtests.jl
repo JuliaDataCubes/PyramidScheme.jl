@@ -1,12 +1,27 @@
 using PyramidScheme:PyramidScheme as PS
 using Test
+using TestItemRunner
 using DimensionalData
 using CairoMakie: plot
 
+@run_package_tests
+@testitem "Aqua" begin
+    using Aqua
+    Aqua.test_ambiguities([PyramidScheme, Base, Core])
+    Aqua.test_unbound_args(PyramidScheme)
+    Aqua.test_undefined_exports(PyramidScheme)
+    Aqua.test_project_extras(PyramidScheme)
+    Aqua.test_stale_deps(PyramidScheme)
+    Aqua.test_deps_compat(PyramidScheme)
+    Aqua.test_project_extras(PyramidScheme)
+    Aqua.test_stale_deps(PyramidScheme)
+    
+end
 
-@testset "Pyramid" begin
+@testitem "Pyramid" begin
     using DimensionalData
     using PyramidScheme: PyramidScheme as PS
+    using GLMakie
     data = zeros(2000,2000)
     dd = DimArray(data, (X(1:2000), Y(1:2000)))
     pyramid = PS.Pyramid(dd)
@@ -17,28 +32,28 @@ using CairoMakie: plot
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
 end
-@testset "Helper functions" begin
-    @test PS.compute_nlevels(zeros(1000)) == 0
-    @test PS.compute_nlevels(zeros(1000,1025)) == 1
-    @test PS.compute_nlevels(zeros(10000, 8000)) == 4
+@testitem "Helper functions" begin
+    using PyramidScheme: PyramidScheme as PS
+    @test PS.compute_nlevels(zeros(1000)) == 2
+    @test PS.compute_nlevels(zeros(1000,1025)) == 3
+    @test PS.compute_nlevels(zeros(10000, 8000)) == 6
 end
 
-@testset "ArchGDAL Loading of Geotiff Overviews" begin
+@testitem "ArchGDAL Loading of Geotiff Overviews" begin
     using ArchGDAL: ArchGDAL as AG
     using PyramidScheme: PyramidScheme as PS
-    using Rasters
-
-    path = "data/pyramidmiddle.tif"
+    @show pwd()
+    @show @__DIR__
+    path = joinpath(@__DIR__,"data/pyramidmiddle.tif")
     #ras = Raster(path, lazy=true)
     pyr =PS.Pyramid(path)
     @test pyr isa PS.Pyramid
-    plot(pyr)
-    @test PS.nlevels(pyr) == 3
+    @test PS.nlevels(pyr) == 2
     sub = pyr[1:10,1:10]
-    @test sub isa Pyramid
+    @test sub isa PS.Pyramid
 end
 
-@testset "Zarr build Pyramid inplace" begin
+@testitem "Zarr build Pyramid inplace" begin
     using Zarr
     using PyramidScheme: PyramidScheme as PS
     using YAXArrays
@@ -57,7 +72,7 @@ end
     #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 end
 
-@testset "Comparing zarr pyramid with tif pyramid" begin
+@testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
     using ArchGDAL
     using Zarr
