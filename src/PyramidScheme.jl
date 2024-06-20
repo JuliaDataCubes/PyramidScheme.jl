@@ -335,5 +335,7 @@ function trans_bounds(
     xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
     return Extent(X = xlims, Y = ylims)
 end
+include("broadcast.jl")
+
 
 end
