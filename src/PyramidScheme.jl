@@ -7,14 +7,23 @@ and the `buildpyramids` function to generate the aggregation layers for an exist
 """
 module PyramidScheme
 
-using DiskArrayEngine: DiskArrayEngine, MovingWindow, RegularWindows, InputArray, create_outwindows, GMDWop
+using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, MovingWindow, RegularWindows
+using DiskArrayEngine: create_outwindows, engine
 using DiskArrays: DiskArrays
-using Zarr: zcreate
+#using YAXArrays: savecube
+using Zarr
+using YAXArrayBase
+const YAB = YAXArrayBase
+using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks
+using Zarr: zcreate, writeattrs
 using DimensionalData: DimensionalData as DD
+using DimensionalData.Dimensions: XDim, YDim
 using Extents
+using FillArrays: Zeros
 using Proj
 using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, on, heatmap!
 import MakieCore: plot, plot!
+using OffsetArrays
 
 using Statistics
 
@@ -31,12 +40,15 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
     "Aggregation layers of the `base` layer."
     levels::L
     "Metadata that describes the aggregation step if available"
+    metadata::Me
 end
 
 function Pyramid(data::DD.AbstractDimArray)
     pyrdata, pyraxs = getpyramids(mean ∘ skipmissing, data, recursive=false)
     levels = DD.DimArray.(pyrdata, pyraxs)
-    Pyramid(data, levels)
+    meta = Dict(deepcopy(DD.metadata(data)))
+    push!(meta, "resampling_method" => "mean_skipmissing")
+    Pyramid(data, levels, meta)
 end
 
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
@@ -55,25 +67,28 @@ end
 """
     levels(pyramid::Pyramid)
 Return all levels of the `pyramid`. These are order from the base to the coarsest aggregation.
+This is an OffsetArray starting at zero for the base of the pyramid.
 """
-levels(pyramid::Pyramid) = [pyramid.base, pyramid.levels...]
+levels(pyramid::Pyramid) = OffsetArray([pyramid.base, pyramid.levels...], 0:length(pyramid.levels))
+
+levels(pyramid::Pyramid, i::Integer) = i==0 ? pyramid.base : pyramid.levels[i]
 """
     nlevels(pyramid)
 Return the number of levels of the `pyramid`
 """
-nlevels(pyramid::Pyramid) = length(levels(pyramid))
+nlevels(pyramid::Pyramid) = length(levels(pyramid)) - 1
 Base.parent(pyramid::Pyramid) = pyramid.base
 Base.size(pyramid::Pyramid) = size(parent(pyramid))
 
 DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
 DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
 DD.dims(pyramid::Pyramid) = DD.dims(parent(pyramid))
-
+DD.metadata(pyramid::Pyramid) = pyramid.metadata
 @inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
-    Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels)
+    Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels, A.metadata)
 end
 
-@inline DD.rebuild(A::Pyramid; kw...) = Pyramid(DD.rebuild(parent(A); kw...), A.levels)
+@inline DD.rebuild(A::Pyramid; kw...) = Pyramid(DD.rebuild(parent(A); kw...), A.levels, DD.metadata(A))
 
 
 @inline function DD.rebuildsliced(f::Function, A::Pyramid, data::AbstractArray, I::Tuple, name=DD.name(A))
@@ -82,9 +97,8 @@ end
         Ilevel =  levelindex(z, I)
         leveldata = f(parent(level), Ilevel...)
         DD.rebuild(level, leveldata, DD.slicedims(f, level, Ilevel)..., name)
-        
     end
-    Pyramid(newbase, newlevels)
+    Pyramid(newbase, newlevels, DD.metadata(A))
 end
 
 function DD.show_after(io::IO, mime, A::Pyramid)
@@ -165,7 +179,7 @@ Fill the pyramids generated from the `data` with the aggregation function `func`
 `recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
 This is an optimization which for functions like median might lead to misleading results.
 """
-function fill_pyramids(data, outputs,func,recursive;kwargs...)
+function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, kwargs...)
     n_level = length(outputs)
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
@@ -180,7 +194,7 @@ function fill_pyramids(data, outputs,func,recursive;kwargs...)
     op = GMDWop((ia,), oa, func)
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
-    r = DiskArrayEngine.LocalRunner(op,lr,outputs;kwargs...)
+    r = runner(op,lr,outputs;kwargs...)
     run(r)
 end
 
@@ -224,27 +238,34 @@ end
 
 Compute the number of levels for the aggregation based on the size of `data`.
 """
-compute_nlevels(data, tilesize=1024) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
+compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
-agg_axis(d,n) = DD.rebuild(d, LinRange(first(d), last(d), cld(length(d), n)))
-
-
+function agg_axis(d,n)
+    DD.rebuild(d, LinRange(first(d), last(d), cld(length(d), n)))
+end
 """
     gen_output(t,s)
 
 Create output array of type `t` and size `s`
-If the array is smaller than 100e6 it is created on disk and otherwise as a temporary zarr file.
+If the array is smaller than 10e6 it is created on disk and otherwise as a temporary zarr file.
 """
-function gen_output(t,s)
+function gen_output(t,s; path=tempname())
+    # This should be dispatching on the output type whether it is internal or external
     outsize = sizeof(t)*prod(s)
+    z = Zeros(t, s...)
     if outsize > 100e6
-        p = tempname()
+        # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
+        # Dummy dataset with FillArrays with the shape of the pyramidlevel
         zcreate(t,s...,path=p,chunks = (1024,1024),fill_value=zero(t))
     else
         zeros(t,s...)
     end
 end
-
+function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray) 
+    dataengine = engine(dimarr.data)
+    DD.rebuild(dimarr, data=dataengine)
+end
+DiskArrayEngine.engine(pyr::Pyramid) = Pyramid(engine(parent(pyr)), engine.(pyr.levels), DD.metadata(pyr))
 """
     output_arrays(pyramid_sizes)
 
@@ -327,7 +348,7 @@ This returns the data of the pyramids and the dimension values of the aggregated
 """
 function getpyramids(reducefunc, ras;recursive=true)
     input_axes = DD.dims(ras)
-    n_level = compute_nlevels(ras)
+    n_level = compute_nlevels(ras)            
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
         [ras], [dims(ras)]
@@ -432,6 +453,32 @@ function trans_bounds(
     xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
     return Extent(X = xlims, Y = ylims)
 end
+
+function write(path, pyramid::Pyramid; kwargs...)
+    savecube(parent(pyramid), path; kwargs...)
+    
+    for (i,l) in enumerate(reverse(pyramid.levels))
+        outpath = joinpath(path, string(i-1))
+        @show outpath
+        savecube(l,outpath)
+    end
+end
+
+"""
+    tms_json(dimarray)
+Construct a Tile Matrix Set json description from an AbstractDimArray.
+This assumes, that we use an ag3ycgregation of two by two pixels in the spatial domain to derive the underlying layers of the pyramids. 
+This returns a string representation of the json and is mainly used for writing the TMS definition to the metadata of the Zarr dataset.
+"""
+function tms_json(pyramid)
+    tms = Dict{String, Any}()
+    push!(tms, "id"=>"TMS_$(string(DD.name(pyramid)))")
+    push!(tms, "title" => "TMS of $(crs(pyramid)) for pyramid")
+    push!(tms, "crs" => string(crs(pyramid)))
+    push!(tms, "orderedAxes" => pyramidaxes())
+    return tms
+end
+
 include("broadcast.jl")
 
 
