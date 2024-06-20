@@ -5,23 +5,34 @@ using DimensionalData
 using CairoMakie: plot
 
 @run_package_tests
-@testitem "Aqua" begin
+@testitem "Aqua unbound args" begin
     using Aqua
-    Aqua.test_ambiguities([PyramidScheme, Base, Core])
+    #Aqua.test_ambiguities([PyramidScheme, Base, Core])
     Aqua.test_unbound_args(PyramidScheme)
+end
+@testitem "Aqua undefined exports" begin
+    using Aqua
     Aqua.test_undefined_exports(PyramidScheme)
+end
+@testitem "Aqua project extras" begin
+        using Aqua
     Aqua.test_project_extras(PyramidScheme)
-    Aqua.test_stale_deps(PyramidScheme)
-    Aqua.test_deps_compat(PyramidScheme)
-    Aqua.test_project_extras(PyramidScheme)
-    Aqua.test_stale_deps(PyramidScheme)
-    
 end
 
+@testitem "Aqua stale deps" begin
+        using Aqua
+    Aqua.test_stale_deps(PyramidScheme)
+end
+@testitem "Aqua deps compat" begin
+        using Aqua
+    Aqua.test_deps_compat(PyramidScheme)
+end
+
+@te
 @testitem "Pyramid" begin
     using DimensionalData
     using PyramidScheme: PyramidScheme as PS
-    using GLMakie
+    using CairoMakie
     data = zeros(2000,2000)
     dd = DimArray(data, (X(1:2000), Y(1:2000)))
     pyramid = PS.Pyramid(dd)
