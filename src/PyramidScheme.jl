@@ -252,6 +252,73 @@ Create the output arrays for the given `pyramid_sizes`
 """
 output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 
+"""
+    SpatialDim
+Union of Dimensions which are assumed to be in space and are therefore used in the pyramid building. 
+"""
+SpatialDim = Union{DD.Dimensions.XDim, DD.Dimensions.YDim}
+
+"""
+    buildpyramids(path; resampling_method=mean)
+Build the pyramids for the zarr dataset at `path` and write the pyramid layers into the zarr folder.
+The different scales are written according to the GeoZarr spec and a multiscales entry is added to the attributes of the zarr dataset.
+The data is aggregated with the specified `resampling_method`. 
+Keyword arguments are forwarded to the `fill_pyramids` function.
+"""
+function buildpyramids(path; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
+    if YAB.backendfrompath(path) != YAB.ZarrDataset 
+        throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
+    end
+
+    # Should this be a dataset not a Cube?
+    # Build a loop for all variables in a dataset?
+    org = Cube(path)
+    # We run the method once to derive the output type
+    t = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    n_level = compute_nlevels(org)            
+    input_axes = filter(x-> x isa SpatialDim,  DD.dims(org))
+    if length(input_axes) != 2
+        throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
+    end
+    verbose && println("Constructing output arrays")
+    outarrs = [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
+    verbose && println("Start computation")
+    fill_pyramids(org, outarrs, resampling_method, recursive;runner)
+    pyraxs = [agg_axis.(input_axes, 2^n) for n in 1:n_level]
+    pyrlevels = DD.DimArray.(outarrs, pyraxs)
+    meta = Dict(deepcopy(DD.metadata(org)))
+    push!(meta, "resampling_method" => string(resampling_method))
+    multiscale = Dict{String, Any}()
+    push!(multiscale, "datasets" => ["path"=> "", ["path" => string(i) for i in 1:n_level]...])
+    push!(multiscale, "type" => "reduce")
+    push!(meta, "multiscales" => [multiscale,])
+    storage, basepath = Zarr.storefromstring(path)
+    writeattrs(storage,basepath, meta)
+    Pyramid(org, pyrlevels, meta)
+    # Construct the TMS metadata from the info of the array
+    # Save TMS to the .zattrs of the original data
+end
+
+# TODO: Decide on how we count levels rather from the bottom to the top or the other way around.
+# I find bottom to top more intuitive but TMS specifies it differently
+
+"""
+    output_zarr(n, input_axes, t, path)
+Construct a Zarr dataset for the level n of a pyramid for the dimensions `input_axes`.
+It sets the type to `t` and saves it to `path/n`
+"""
+function output_zarr(n, input_axes, t, path)
+    aggdims = agg_axis.(input_axes, 2^n)
+    s = length.(aggdims)
+    z = Zeros(t, s...)
+    yax = YAXArray(aggdims, z)
+    chunked = setchunks(yax , (1024, 1024))
+    # This assumes that there is only the spatial dimensions to save
+    ds = to_dataset(chunked, )
+    dssaved = savedataset(ds; path, skeleton=true, driver=:zarr)
+    zar = dssaved.layer.data
+    zar
+end 
 
 """
     getpyramids(ras)
