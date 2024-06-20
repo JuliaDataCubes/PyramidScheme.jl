@@ -1,10 +1,11 @@
 module PyramidSchemeArchGDALExt
 using ArchGDAL: ArchGDAL as AG
 using PyramidScheme: PyramidScheme as PS
-using Rasters
+using YAXArrays
+using DimensionalData
 
 function PS.Pyramid(path::AbstractString)
-    base = Raster(path, lazy=true)
+    base = Cube(path)
     agbase = AG.readraster(path)
     band = AG.getband(agbase,1)
     numlevels = AG.noverview(band)
@@ -15,15 +16,15 @@ function PS.Pyramid(path::AbstractString)
         dbase = dims(base,(1,2))
         pyrlevels = Raster[]
         for n in 0:numlevels-1
-            levelbands = [Raster(AG.getoverview(AG.getband(agbase,bind), n), PS.agg_axis.(dbase, 2^(n+1))) for bind in bandindices]
+            levelbands = [YAXArray(PS.agg_axis.(dbase, 2^(n+1)), AG.getoverview(AG.getband(agbase,bind), n)) for bind in bandindices]
             level = cat(levelbands..., dims=banddim)
             push!(pyrlevels, level)
         end
         pyrlevels
     else 
-        pyrlevels = [Raster(AG.getoverview(band, n), PS.agg_axis.(dims(base), 2^(n+1))) for n in 0:numlevels-1]
+        pyrlevels = [YAXArray(PS.agg_axis.(dims(base), 2^(n+1)),AG.getoverview(band, n)) for n in 0:numlevels-1]
     end
-    PS.Pyramid(base, pyrlevels)
+    PS.Pyramid(base, pyrlevels, metadata(base))
 end
 
 end
