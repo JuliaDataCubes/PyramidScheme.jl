@@ -348,12 +348,11 @@ Internal function to select the raster data that should be plotted on screen.
 `ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
 `target_imsize` is the target size of the output data that should be plotted.
 """
-function selectlevel(pyramid, ext;target_imsize=(1024, 512))
+function selectlevel(pyramid, ext, resolution;target_imsize=(1024, 512))
     # TODO automatically set the target_imsize
     imsize = map(keys(ext)) do bb
-        resolution = abs(step(DD.dims(pyramid, bb)))
 
-        (ext[bb][2] - ext[bb][1]) / resolution
+        (ext[bb][2] - ext[bb][1]) / resolution[bb]
     end
     dimlevels = log2.(imsize ./ target_imsize)
     minlevel = maximum(dimlevels)
@@ -381,29 +380,50 @@ function plot(pyramid::Pyramid;colorbar=true, kwargs...)
     FigureAxisPlot(fig, ax, hmap)
 end
 
-
+xkey(keyext) = DD.dim2key(DD.dims(keyext, XDim))
+ykey(keyext) = DD.dim2key(DD.dims(keyext, YDim))
+#TODO write test, move to utils.jl
+function switchkeys(dataext, keyext)
+    xk = xkey(keyext)
+    yk = ykey(keyext)
+    nt = NamedTuple{(xk, yk)}((dataext.X, dataext.Y))
+    Extent(nt)
+end
 
 function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
-    data = Observable{DD.AbstractDimArray}(levels(pyramid)[end])
+    tip = levels(pyramid)[end][:,:]
+    #@show typeof(tip)
+    data = Observable{DD.AbstractDimMatrix}(tip)
+    xval = only(values(Extents.extent(pyramid, XDim)))
+    yval = only(values(Extents.extent(pyramid, YDim)))
+    rasdataext = Extent(X=xval, Y=yval)
     rasext = extent(pyramid)
+    xk = xkey(rasext)
+    yk = ykey(rasext)
+    resolution = NamedTuple{(xk, yk)}((abs(step(DD.dims(pyramid, XDim))), abs(step(DD.dims(pyramid, YDim)))))
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
         # Compute limit in raster projection
         #trans = Proj.Transformation(plotcrs, rastercrs, always_xy=true)
         #datalimit = trans_bounds(trans, limext)
-        datalimit = limext
-        if Extents.intersects(rasext, datalimit)
-            rasdata = selectlevel(pyramid, datalimit)
-            #@show rasdata
+        datalimit = switchkeys(limext, rasext)
+        if Extents.intersects(rasdataext, limext)
+            rasdata = selectlevel(pyramid, datalimit, resolution)
             # Project selected data to plotcrs
             #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
             data.val = rasdata
         end
         notify(data)
     end
-    hmap = plot!(ax, data; interpolate=false, kwargs...)
+    #@show typeof(data)
+    hmap = heatmap!(ax, data; interpolate=false, kwargs...)
 end
 
+"""
+    trans_bounds(trans::Proj.Transformation, bbox::Extent, densify_pts::Integer)
+Compute the projection of `bbox` with the transformation `trans`. 
+This is used to project the data on the fly to another transformation.
+"""
 function trans_bounds(
     trans::Proj.Transformation,
     bbox::Extent,
