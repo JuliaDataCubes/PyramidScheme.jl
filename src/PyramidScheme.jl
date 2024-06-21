@@ -104,6 +104,7 @@ end
 function DD.show_after(io::IO, mime, A::Pyramid)
     blockwidth = get(io, :blockwidth, 0)
     DD.print_block_separator(io, "pyramidlevels", blockwidth)
+    println(io)
     println(io, "  Number of levels: $(nlevels(A)) ")
     for l in levels(A)
         println(io, "   ", size(l))
@@ -412,7 +413,7 @@ function switchkeys(dataext, keyext)
 end
 
 function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
-    tip = levels(pyramid)[end][:,:]
+    tip = levels(pyramid)[end-2][:,:]
     #@show typeof(tip)
     data = Observable{DD.AbstractDimMatrix}(tip)
     xval = only(values(Extents.extent(pyramid, XDim)))
