@@ -14,7 +14,7 @@ using DiskArrays: DiskArrays
 using Zarr
 using YAXArrayBase
 const YAB = YAXArrayBase
-using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks
+using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
 using Zarr: zcreate, writeattrs
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
@@ -55,10 +55,11 @@ Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
     backend isa YAB.ZarrDataset || error("does only work for Zarr data")
-
-    base = Cube(path)[Ti=1] # This getindex should be unnecessary and I should rather fix my data on disk
-    levavail = extrema(parse.(Int,readdir(path)[contains.(readdir(path), r"\d")]))
-    clevels = [Cube(joinpath(path, string(l))) for l in 1:last(levavail)]
+    g = zopen(path)
+    allkeys = collect(keys(g.groups))
+    base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
+    levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
+    clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
     Pyramid(base, clevels, Dict())
 end
 # refdims
