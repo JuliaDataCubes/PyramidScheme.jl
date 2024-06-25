@@ -34,6 +34,7 @@ ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 PyramidSchemeArchGDALExt = "ArchGDAL"
 
 [compat]
+ArchGDAL = "0.10"
 DiskArrayEngine = "0.1.1"
 julia = "1.9"
 
