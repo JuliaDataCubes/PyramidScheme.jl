@@ -13,7 +13,7 @@ function Base.copy(bc::Broadcasted{PyramidStyle})
         argslevel = levels.(inputs, (l,))
         argdata = getproperty.(argslevel, :data)
         newdata = func.(argdata...)
-        newdimarr = DD.rebuild(first(argslevel), data=newdata)
+        newdimarr = DD.rebuild(first(argslevel), data=newdata, dims=DD.dims(first(argslevel)))
         newdimarr
     end
     #@show typeof(newlevels)

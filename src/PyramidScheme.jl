@@ -14,14 +14,14 @@ using DiskArrays: DiskArrays
 using Zarr
 using YAXArrayBase
 const YAB = YAXArrayBase
-using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks
+using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
 using Zarr: zcreate, writeattrs
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents
 using FillArrays: Zeros
 using Proj
-using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, on, heatmap!
+using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, on, heatmap!, image!
 import MakieCore: plot, plot!
 using OffsetArrays
 
@@ -54,11 +54,26 @@ end
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
-    backend isa YAB.ZarrDataset || error("does only work for Zarr data")
+    if backend isa YAB.ZarrDataset
+        _pyramid_zarr(path)
+    elseif backend isa YAB.GDALDataset
+        _pyramid_gdal(path)
+    else
+        throw(ArgumentError("""
+        Loading is only supported for Zarr and GDAL Datasets got $backend.
+        If you want to use GDAL you first have to load ArchGDAL.jl    
+        """))
+    end
+end
 
+function _pyramid_gdal end
+
+function _pyramid_zarr(path)
+    g = zopen(path)
+    allkeys = collect(keys(g.groups))
     base = Cube(path)[Ti=1] # This getindex should be unnecessary and I should rather fix my data on disk
-    levavail = extrema(parse.(Int,readdir(path)[contains.(readdir(path), r"\d")]))
-    clevels = [Cube(joinpath(path, string(l))) for l in 1:last(levavail)]
+    levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
+    clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
     Pyramid(base, clevels, Dict())
 end
 # refdims
@@ -364,10 +379,11 @@ function getpyramids(reducefunc, ras;recursive=true)
 end
 
 """
-    selectlevel(pyramids, ext, resolution=10; target_imsize=(1024,512)
+    selectlevel(pyramids, ext, resolution; target_imsize=(1024,512)
 Internal function to select the raster data that should be plotted on screen. 
 `pyramids` is a Vector of Raster objects with increasing coarsity. 
-`ext` is the extent of the zoomed in area and `resolution` is the resolution of the data at highest resolution.
+`ext` is the extent of the zoomed in area
+`resolution` is the resolution of the data at highest resolution in the units of the axes as a Tuple.
 `target_imsize` is the target size of the output data that should be plotted.
 """
 function selectlevel(pyramid, ext, resolution;target_imsize=(1024, 512))
@@ -412,8 +428,8 @@ function switchkeys(dataext, keyext)
     Extent(nt)
 end
 
-function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
-    tip = levels(pyramid)[end-2][:,:]
+function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
+    tip = levels(pyramid)[end][:,:]
     #@show typeof(tip)
     data = Observable{DD.AbstractDimMatrix}(tip)
     xval = only(values(Extents.extent(pyramid, XDim)))
@@ -430,7 +446,7 @@ function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),
         #datalimit = trans_bounds(trans, limext)
         datalimit = switchkeys(limext, rasext)
         if Extents.intersects(rasdataext, limext)
-            rasdata = selectlevel(pyramid, datalimit, resolution)
+            rasdata = selectlevel(pyramid, datalimit, resolution, target_imsize=ax.scene.viewport[].widths)
             # Project selected data to plotcrs
             #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
             data.val = rasdata
@@ -438,7 +454,7 @@ function plot!(ax, pyramid::Pyramid;kwargs...)#; rastercrs=crs(parent(pyramid)),
         notify(data)
     end
     #@show typeof(data)
-    hmap = heatmap!(ax, data; interpolate=false, kwargs...)
+    hmap = image!(ax, data; interpolate=interp, kwargs...)
 end
 
 """
