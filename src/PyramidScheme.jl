@@ -54,10 +54,24 @@ end
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
-    backend isa YAB.ZarrDataset || error("does only work for Zarr data")
+    if backend isa YAB.ZarrDataset
+        _pyramid_zarr(path)
+    elseif backend isa YAB.GDALDataset
+        _pyramid_gdal(path)
+    else
+        throw(ArgumentError("""
+        Loading is only supported for Zarr and GDAL Datasets got $backend.
+        If you want to use GDAL you first have to load ArchGDAL.jl    
+        """))
+    end
+end
+
+function _pyramid_gdal end
+
+function _pyramid_zarr(path)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
-    base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
+    base = Cube(path)[Ti=1] # This getindex should be unnecessary and I should rather fix my data on disk
     levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
     clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
     Pyramid(base, clevels, Dict())

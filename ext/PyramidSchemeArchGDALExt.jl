@@ -1,10 +1,10 @@
 module PyramidSchemeArchGDALExt
 using ArchGDAL: ArchGDAL as AG
-using PyramidScheme: PyramidScheme as PS
+using PyramidScheme: PyramidScheme as PS, _pyramid_gdal
 using YAXArrays
 using DimensionalData
 
-function PS.Pyramid(path::AbstractString)
+function _pyramid_gdal(path::AbstractString)
     base = Cube(path)
     agbase = AG.readraster(path)
     band = AG.getband(agbase,1)
