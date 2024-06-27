@@ -27,7 +27,7 @@ using OffsetArrays
 
 using Statistics
 
-
+export Pyramid, buildpyramids
 
 """
     Pyramid
@@ -119,6 +119,7 @@ end
 function DD.show_after(io::IO, mime, A::Pyramid)
     blockwidth = get(io, :blockwidth, 0)
     DD.print_block_separator(io, "pyramidlevels", blockwidth)
+    println(io)
     println(io, "  Number of levels: $(nlevels(A)) ")
     for l in levels(A)
         println(io, "   ", size(l))
