@@ -15,7 +15,7 @@ function _pyramid_gdal(path::AbstractString)
         banddim = dims(base, 3)
         bandindices = 1: AG.nraster(agbase)
         dbase = dims(base,(1,2))
-        pyrlevels = Raster[]
+        pyrlevels = AbstractDimArray[]
         for n in 0:numlevels-1
             levelbands = [YAXArray(PS.agg_axis.(dbase, 2^(n+1)), AG.getoverview(AG.getband(agbase,bind), n)) for bind in bandindices]
             level = cat(levelbands..., dims=banddim)

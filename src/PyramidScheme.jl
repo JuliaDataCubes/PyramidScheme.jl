@@ -103,7 +103,11 @@ DD.metadata(pyramid::Pyramid) = pyramid.metadata
     Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels, A.metadata)
 end
 
-@inline DD.rebuild(A::Pyramid; kw...) = Pyramid(DD.rebuild(parent(A); kw...), A.levels, DD.metadata(A))
+@inline function DD.rebuild(A::Pyramid; kw...)
+    newbase = DD.rebuild(parent(A);dims=DD.dims(A), kw...)
+    Pyramid(newbase, A.levels, DD.metadata(A))
+end
+
 
 
 @inline function DD.rebuildsliced(f::Function, A::Pyramid, data::AbstractArray, I::Tuple, name=DD.name(A))
@@ -114,6 +118,13 @@ end
         DD.rebuild(level, leveldata, DD.slicedims(f, level, Ilevel)..., name)
     end
     Pyramid(newbase, newlevels, DD.metadata(A))
+end
+
+function Base.map(f, A::Pyramid)
+    newbase = map(f, parent(A))
+    newlevels = [map(f, levels(A,i)) for i in 1:nlevels(A)]
+    @show typeof(newlevels)
+    Pyramid(newbase, newlevels, DD.metadata(A)) # This should handle metadata better.
 end
 
 function DD.show_after(io::IO, mime, A::Pyramid)
@@ -430,7 +441,7 @@ function switchkeys(dataext, keyext)
 end
 
 function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
-    tip = levels(pyramid)[end][:,:]
+    tip = levels(pyramid)[end-2][:,:]
     #@show typeof(tip)
     data = Observable{DD.AbstractDimMatrix}(tip)
     xval = only(values(Extents.extent(pyramid, XDim)))
