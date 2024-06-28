@@ -257,7 +257,8 @@ Compute the number of levels for the aggregation based on the size of `data`.
 compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
 function agg_axis(d,n)
-    DD.rebuild(d, LinRange(first(d), last(d), cld(length(d), n)))
+    # TODO this might be problematic for explicitly set axes
+    DD.set(d, LinRange(first(d), last(d), cld(length(d), n)))
 end
 """
     gen_output(t,s)
@@ -272,7 +273,7 @@ function gen_output(t,s; path=tempname())
     if outsize > 100e6
         # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
         # Dummy dataset with FillArrays with the shape of the pyramidlevel
-        zcreate(t,s...,path=p,chunks = (1024,1024),fill_value=zero(t))
+        zcreate(t,s...;path,chunks = (1024,1024),fill_value=zero(t))
     else
         zeros(t,s...)
     end

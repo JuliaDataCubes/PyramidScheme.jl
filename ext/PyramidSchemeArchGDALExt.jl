@@ -1,6 +1,7 @@
 module PyramidSchemeArchGDALExt
 using ArchGDAL: ArchGDAL as AG
-using PyramidScheme: PyramidScheme as PS, _pyramid_gdal
+using PyramidScheme: PyramidScheme as PS
+import PyramidScheme: _pyramid_gdal
 using YAXArrays
 using DimensionalData
 
