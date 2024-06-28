@@ -257,7 +257,8 @@ Compute the number of levels for the aggregation based on the size of `data`.
 compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
 function agg_axis(d,n)
-    DD.rebuild(d, LinRange(first(d), last(d), cld(length(d), n)))
+    # TODO this might be problematic for explicitly set axes
+    DD.set(d, LinRange(first(d), last(d), cld(length(d), n)))
 end
 """
     gen_output(t,s)
