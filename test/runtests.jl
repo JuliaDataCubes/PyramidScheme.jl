@@ -123,3 +123,19 @@ end
 end
 =#
 
+@testitem "Building pyramid with additional dimension in memory" begin
+    # The aim of this test is to check whether we can build a pyramid from a data cube with an extra dimension.
+    # We will only build the pyramids on the spatial dimensions and keep the other dimensions as is.
+    using YAXArrays
+    using Zarr
+    using PyramidScheme
+    orgpath = joinpath(@__DIR__, "data", "world.zarr")
+    path = tempname() * ".zarr"
+    cp(orgpath, path)
+    c = Cube(path)
+    @time "Building world pyramid" pyr = Pyramid(c)
+    @test pyr isa Pyramid 
+    @test length(dims(pyr)) == 3
+    @test size(pyr.levels)[end] = (256,128,3)
+    
+end
