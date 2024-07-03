@@ -6,6 +6,7 @@ The pyramids can then be used to interactively explore the data.
 
 The long term aim of PyramidScheme.jl is to enable computing based on the layers of the pyramid to enable a more interactive exploration of computations based of pyramided datasets. 
 
+[PyramidScheme.jl in action](https://github.com/JuliaDataCubes/PyramidScheme.jl/assets/17124431/63166348-7b18-4af1-b6bb-4eb0af2def9e)
 
 
 ## Usage
@@ -40,4 +41,22 @@ elev = Cube(elevpath)
 zarrpath = tempname() * ".zarr"
 savecube(elev, zarrpath)
 @time PS.buildpyramids(zarrpath)
-``` 
+```
+
+### Example above
+
+To reproduce the zooming example shown at the top of the README you can get the Above Ground Biomass here or try to load it from the cloud, but this might have some serious lag.
+```julia
+using YAXArrays, PyramidScheme
+using GLMakie
+p2020 = PS.Pyramid("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
+replacenan(nanval) =  data -> <=(nanval)(data) ? NaN32 : Float32(data)
+p2020nan = replacenan(0).(p2020)
+plot(p2020nan, colormap=:speed, colorscale=sqrt)
+
+# to save the base data use YAXArrays to load the underlying data
+c = Cube("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
+savecube(c, "somepath.zarr")
+# Build the pyramid from this data locally
+buildpyramids("somepath.zarr")
+```
