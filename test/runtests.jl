@@ -83,6 +83,30 @@ end
     #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 end
 
+@testitem "selectlevel" begin
+    using PyramidScheme: PyramidScheme as PS
+    using YAXArrays
+    using Extents
+    using DimensionalData: DimensionalData as DD
+    using DimensionalData.Dimensions
+    using Test
+    a = rand(1500, 1524)
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
+    pyramid = PS.Pyramid(yax)
+
+    target_imsize=(1024, 1024)
+    sub =  PS.selectlevel(pyramid, extent(pyramid); target_imsize)
+    @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
+    @test size(sub) == (750, 762)
+    target_imsize=(256, 256)
+    sub =  PS.selectlevel(pyramid, extent(pyramid); target_imsize)
+    @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
+    target_imsize=(400, 300)
+    sub =  PS.selectlevel(pyramid, extent(pyramid); target_imsize)
+    @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
+
+end
+
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS

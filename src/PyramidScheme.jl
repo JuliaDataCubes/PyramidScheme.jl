@@ -395,18 +395,19 @@ end
 Internal function to select the raster data that should be plotted on screen. 
 `pyramids` is a Vector of Raster objects with increasing coarsity. 
 `ext` is the extent of the zoomed in area
-`resolution` is the resolution of the data at highest resolution in the units of the axes as a Tuple.
 `target_imsize` is the target size of the output data that should be plotted.
 """
-function selectlevel(pyramid, ext, resolution;target_imsize=(1024, 512))
-    # TODO automatically set the target_imsize
-    imsize = map(keys(ext)) do bb
-
-        (ext[bb][2] - ext[bb][1]) / resolution[bb]
+function selectlevel(pyramid, ext;target_imsize=(1024, 512))
+    pyrext = extent(pyramid)
+    basepixels = map(keys(pyrext)) do bb
+        pyrspan = pyrext[bb][2] - pyrext[bb][1]
+        imsize = ext[bb][2] - ext[bb][1]
+        imsize / pyrspan * size(pyramid, bb)
     end
-    dimlevels = log2.(imsize ./ target_imsize)
+    dimlevels = log2.(basepixels ./ target_imsize)
     minlevel = maximum(dimlevels)
-    n_agg = min(max(ceil(Int,minlevel) + 1,1),nlevels(pyramid))
+    n_agg = min(max(ceil(Int,minlevel),0),nlevels(pyramid))
+    @debug "Selected level $n_agg"
     levels(pyramid)[n_agg][ext]
 end
 
@@ -467,7 +468,7 @@ function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(par
         #datalimit = trans_bounds(trans, limext)
         datalimit = switchkeys(limext, rasext)
         if Extents.intersects(rasdataext, limext)
-            rasdata = selectlevel(pyramid, datalimit, resolution, target_imsize=ax.scene.viewport[].widths)
+            rasdata = selectlevel(pyramid, datalimit, target_imsize=ax.scene.viewport[].widths)
             # Project selected data to plotcrs
             #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
             data.val = rasdata
