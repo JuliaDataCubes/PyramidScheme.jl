@@ -21,7 +21,8 @@ using DimensionalData.Dimensions: XDim, YDim
 using Extents
 using FillArrays: Zeros
 using Proj
-using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, on, heatmap!, image!
+using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, Relative
+using Makie: on, heatmap!, image!
 import MakieCore: plot, plot!
 using OffsetArrays
 
@@ -425,7 +426,7 @@ function plot(pyramid::Pyramid;colorbar=true, kwargs...)
     ax = Axis(fig[1,1], limits=(extrema(lon), extrema(lat)), aspect=DataAspect())
     hmap = plot!(ax, pyramid;kwargs...)
     if colorbar
-        Colorbar(fig[1,2], hmap)
+        Colorbar(fig[1,2], hmap, height = Relative(3.5 / 4))
     end
     ax.autolimitaspect = 1
     FigureAxisPlot(fig, ax, hmap)
@@ -460,7 +461,14 @@ function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(par
     rasext = extent(pyramid)
     xk = xkey(rasext)
     yk = ykey(rasext)
-    resolution = NamedTuple{(xk, yk)}((abs(step(DD.dims(pyramid, XDim))), abs(step(DD.dims(pyramid, YDim)))))
+    on(ax.scene.viewport) do viewport
+        limext = Extents.extent(ax.finallimits[])
+
+        datalimit = switchkeys(limext, rasext)
+
+        data.val = selectlevel(pyramid, datalimit, target_imsize=viewport.widths)
+        notify(data)
+    end
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
         # Compute limit in raster projection
