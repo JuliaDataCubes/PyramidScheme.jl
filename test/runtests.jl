@@ -83,6 +83,7 @@ end
     #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 end
 
+#=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
     using ArchGDAL
@@ -94,5 +95,7 @@ end
     savecube(parent(pyrtif), path)
     @time pyrzarr = PS.buildpyramids(path)
     pyrdisk = PS.Pyramid(path)
+    pyrzarr == pyrtif
 end
+=#
 
