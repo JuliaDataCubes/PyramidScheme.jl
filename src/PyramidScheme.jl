@@ -433,6 +433,15 @@ end
 xkey(keyext) = DD.dim2key(DD.dims(keyext, XDim))
 ykey(keyext) = DD.dim2key(DD.dims(keyext, YDim))
 #TODO write test, move to utils.jl
+
+"""
+    switchkeys(dataext, keyext)
+Internal function
+
+### Extended help
+    Return an Extent with the limits from `dataext` on the keys of `keyext`.
+    We assume that dataext has keys X, and Y and the keys of keyext are XDim and YDim from DimensionalData
+"""
 function switchkeys(dataext, keyext)
     xk = xkey(keyext)
     yk = ykey(keyext)
