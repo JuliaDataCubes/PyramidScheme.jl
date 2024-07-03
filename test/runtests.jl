@@ -66,7 +66,7 @@ end
 
 @testitem "Zarr build Pyramid inplace" begin
     using Zarr
-    using PyramidScheme: PyramidScheme as PS
+    using PyramidScheme
     using YAXArrays
     using Statistics
     using DimensionalData
@@ -74,11 +74,11 @@ end
     yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
     path = tempname() *".zarr"
     savecube(yax, path)
-    pyr = PS.buildpyramids(path, resampling_method=mean)
+    pyr = buildpyramids(path, resampling_method=mean)
     @test pyr isa Pyramid
     pyrdisk = Pyramid(path)
     @test pyrdisk isa Pyramid 
-    @test pyr .== pyrdisk
+    @test pyr == pyrdisk
     #pyrmem = PS.Pyramid(yax)
     #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 end
