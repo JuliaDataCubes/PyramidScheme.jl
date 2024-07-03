@@ -28,7 +28,7 @@ end
     Aqua.test_deps_compat(PyramidScheme)
 end
 
-@te
+
 @testitem "Pyramid" begin
     using DimensionalData
     using PyramidScheme: PyramidScheme as PS
