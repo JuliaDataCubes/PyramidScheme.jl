@@ -20,7 +20,6 @@ using ArchGDAL
 using Statistics
 using Extents
 using PyramidScheme: PyramidScheme as PS
-path = 
 ras = Raster(WorldClim{Elevation},:elev, res="30s", lazy=true)
 pyr = PS.Pyramid(ras)
 
