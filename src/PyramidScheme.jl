@@ -409,7 +409,22 @@ function selectlevel(pyramid, ext;target_imsize=(1024, 512))
     minlevel = maximum(dimlevels)
     n_agg = min(max(ceil(Int,minlevel),0),nlevels(pyramid))
     @debug "Selected level $n_agg"
-    levels(pyramid)[n_agg][ext]
+    #First load overview
+    overview1 = min(n_agg + 4, nlevels(pyramid))
+    data = levels(pyramid)[overview1][ext]
+    odata = Observable{Any}(data)
+    l = ReentrantLock()
+    for level in (overview1-1):-1:n_agg
+        @async begin
+            leveldata = levels(pyramid)[level][ext]
+            lock(l) do
+                if length(odata[]) < length(leveldata)
+                    odata[] = leveldata
+                end
+            end
+        end
+    end
+    odata
 end
 
 
@@ -451,23 +466,46 @@ function switchkeys(dataext, keyext)
     Extent(nt)
 end
 
+struct PlotData
+    data::Observable{DD.AbstractDimMatrix}
+    worldage::Base.RefValue{UInt64}
+    lock::ReentrantLock
+end
+
 function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(parent(pyramid)),plotcrs=EPSG(3857), kwargs...)
     tip = levels(pyramid)[end-2][:,:]
     #@show typeof(tip)
-    data = Observable{DD.AbstractDimMatrix}(tip)
+    data = PlotData(
+        Observable{DD.AbstractDimMatrix}(tip),
+        Ref(UInt64(0)),
+        ReentrantLock()
+    )
     xval = only(values(Extents.extent(pyramid, XDim)))
     yval = only(values(Extents.extent(pyramid, YDim)))
     rasdataext = Extent(X=xval, Y=yval)
     rasext = extent(pyramid)
     xk = xkey(rasext)
     yk = ykey(rasext)
+    limext = Extents.extent(ax.finallimits[])
+    datalimit = Observable{Any}(switchkeys(limext, rasext))
     on(ax.scene.viewport) do viewport
         limext = Extents.extent(ax.finallimits[])
 
         datalimit = switchkeys(limext, rasext)
 
-        data.val = selectlevel(pyramid, datalimit, target_imsize=viewport.widths)
-        notify(data)
+        wa = lock(data.lock) do
+            data.worldage[] += 1
+        end
+
+        on(selectlevel(pyramid, datalimit, target_imsize=viewport.widths)) do updata
+            lock(data.lock) do
+                if data.worldage[] == wa
+                    data.data[] = updata
+                end
+            end
+        end
+
+        #notify(data)
     end
     on(ax.finallimits) do limits
         limext = Extents.extent(limits)
@@ -476,15 +514,21 @@ function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(par
         #datalimit = trans_bounds(trans, limext)
         datalimit = switchkeys(limext, rasext)
         if Extents.intersects(rasdataext, limext)
-            rasdata = selectlevel(pyramid, datalimit, target_imsize=ax.scene.viewport[].widths)
-            # Project selected data to plotcrs
-            #data.val = Rasters.resample(rasdata, crs=plotcrs, method=:bilinear )
-            data.val = rasdata
+            wa = lock(data.lock) do
+                data.worldage[] += 1
+            end
+
+            on(selectlevel(pyramid, datalimit, target_imsize=ax.scene.viewport[].widths)) do updata
+                lock(data.lock) do
+                    if data.worldage[] == wa
+                        data.data[] = updata
+                    end
+                end
+            end
         end
-        notify(data)
     end
     #@show typeof(data)
-    hmap = image!(ax, data; interpolate=interp, kwargs...)
+    hmap = image!(ax, data.data; interpolate=interp, kwargs...)
 end
 
 """
