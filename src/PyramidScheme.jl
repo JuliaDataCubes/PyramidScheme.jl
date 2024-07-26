@@ -128,6 +128,11 @@ function Base.map(f, A::Pyramid)
     Pyramid(newbase, newlevels, DD.metadata(A)) # This should handle metadata better.
 end
 
+function DiskArrays.cache(p::Pyramid; maxsize=1000)
+    maxsize = maxsize ÷ (length(p.levels) + 1)
+    Pyramid(DiskArrays.cache(p.base; maxsize), DiskArrays.cache.(p.levels; maxsize), p.metadata)
+end
+
 function DD.show_after(io::IO, mime, A::Pyramid)
     blockwidth = get(io, :blockwidth, 0)
     DD.print_block_separator(io, "pyramidlevels", blockwidth)
