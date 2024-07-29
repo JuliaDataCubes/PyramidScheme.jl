@@ -44,8 +44,8 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
     metadata::Me
 end
 
-function Pyramid(data::DD.AbstractDimArray)
-    pyrdata, pyraxs = getpyramids(mean ∘ skipmissing, data, recursive=false)
+function Pyramid(data::DD.AbstractDimArray; resampling_method=mean ∘ skipmissing, kwargs...)
+    pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
     levels = DD.DimArray.(pyrdata, pyraxs)
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
@@ -72,10 +72,10 @@ function _pyramid_gdal end
 function _pyramid_zarr(path)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
-    base = Cube(path)[Ti=1] # This getindex should be unnecessary and I should rather fix my data on disk
+    base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
     levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
     clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
-    Pyramid(base, clevels, Dict())
+    Pyramid(base[Ti=1], clevels, DD.metadata(base))
 end
 # refdims
 # name
@@ -124,7 +124,6 @@ end
 function Base.map(f, A::Pyramid)
     newbase = map(f, parent(A))
     newlevels = [map(f, levels(A,i)) for i in 1:nlevels(A)]
-    @show typeof(newlevels)
     Pyramid(newbase, newlevels, DD.metadata(A)) # This should handle metadata better.
 end
 
@@ -315,7 +314,7 @@ The different scales are written according to the GeoZarr spec and a multiscales
 The data is aggregated with the specified `resampling_method`. 
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
-function buildpyramids(path; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
+function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
     if YAB.backendfrompath(path) != YAB.ZarrDataset 
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
@@ -441,7 +440,7 @@ ykey(keyext) = DD.dim2key(DD.dims(keyext, YDim))
 Internal function
 
 ### Extended help
-    Return an Extent with the limits from `dataext` on the keys of `keyext`.
+    Return an Extent with the limits from `dataext` and the keys of `keyext`.
     We assume that dataext has keys X, and Y and the keys of keyext are XDim and YDim from DimensionalData
 """
 function switchkeys(dataext, keyext)
@@ -484,7 +483,7 @@ function plot!(ax, pyramid::Pyramid;interp=false, kwargs...)#; rastercrs=crs(par
         notify(data)
     end
     #@show typeof(data)
-    hmap = image!(ax, data; interpolate=interp, kwargs...)
+    hmap = heatmap!(ax, data; interpolate=interp, kwargs...)
 end
 
 """
