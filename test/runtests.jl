@@ -121,6 +121,17 @@ end
 
 end
 
+@testitem "tilepyramid" begin
+    using TileProviders
+    using DimensionalData
+    prov = OpenStreetMap()
+    pyr = Pyramid(prov)
+    @test size(pyr.levels[end]) == (3,256,256)
+    @test PyramidScheme.nlevels(pyr) == 19
+    pyrrgb = Pyramid(prov, :rgb)
+    @test size(pyrrgb.levels[end]) == (256,256)
+    @test PyramidScheme.nlevels(pyrrgb) == 19
+end
 
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
