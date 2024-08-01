@@ -3,12 +3,12 @@ import Colors: RGB
 import HTTP
 import FileIO: save, Stream, @format_str
 
-struct PyramidProvider{P<:Pyramid{T}} where {T<:TileProviders.AbstractProvider}
+struct PyramidProvider{P<:Pyramid{T} where T} <: TileProviders.AbstractProvider
     p::P
     min_zoom::Int
     max_zoom::Int
     data_min::T
-    data_max::Float64
+    data_max::T
     colorscheme::Symbol
     nodatacolor::RGB{Float64}
 end
