@@ -10,7 +10,7 @@ import DimensionalData: Dim, X, Y
 struct MapTileDiskArray{T,N,P<:AbstractProvider} <: DiskArrays.ChunkTiledDiskArray{T,N}
     prov::P
     zoom::Int
-    tilesize::Int
+    tilesize::Tuple{Int,Int}
     nband::Int
 end
 function MapTileDiskArray(prov, zoom, mode=:band)
@@ -31,8 +31,8 @@ function MapTileDiskArray(prov, zoom, mode=:band)
         error("Unknown mode $mode")
     end
 end
-DiskArrays.eachchunk(a::MapTileDiskArray{<:Any,3}) = DiskArrays.GridChunks((a.nband, a.tilesize * 2^a.zoom, a.tilesize * 2^a.zoom), (a.nband, a.tilesize, a.tilesize))
-DiskArrays.eachchunk(a::MapTileDiskArray{<:Any,2}) = DiskArrays.GridChunks((a.tilesize * 2^a.zoom, a.tilesize * 2^a.zoom), (a.tilesize, a.tilesize))
+DiskArrays.eachchunk(a::MapTileDiskArray{<:Any,3}) = DiskArrays.GridChunks((a.nband, a.tilesize[1] * 2^a.zoom, a.tilesize[2] * 2^a.zoom), (a.nband, a.tilesize...))
+DiskArrays.eachchunk(a::MapTileDiskArray{<:Any,2}) = DiskArrays.GridChunks((a.tilesize[1] * 2^a.zoom, a.tilesize[2] * 2^a.zoom), a.tilesize)
 
 DiskArrays.haschunks(::MapTileDiskArray) = DiskArrays.Chunked()
 
@@ -71,16 +71,16 @@ end
 function dimsfromzoomlevel(zoom, tilesize)
     t1 = Tile(1, 1, zoom)
     ntiles = 2^zoom
-    npix = ntiles * tilesize
+    npix = ntiles .* tilesize
     t2 = Tile(ntiles, ntiles, zoom)
     ex1 = extent(t1, web_mercator)
     ex2 = extent(t2, web_mercator)
     x1, x2 = first(ex1.X), last(ex2.X)
     y1, y2 = first(ex1.Y), last(ex2.Y)
-    stepx = (x2 - x1) / npix
-    stepy = (y2 - y1) / npix
-    x = X(DD.Sampled(range(x1, x2 - stepx, length=npix), sampling=DD.Intervals(DD.Start())))
-    y = Y(DD.Sampled(range(y1, y2 - stepy, length=npix), sampling=DD.Intervals(DD.Start())))
+    stepx = (x2 - x1) / npix[1]
+    stepy = (y2 - y1) / npix[2]
+    x = X(DD.Sampled(range(x1, x2 - stepx, length=npix[1]), sampling=DD.Intervals(DD.Start())))
+    y = Y(DD.Sampled(range(y1, y2 - stepy, length=npix[2]), sampling=DD.Intervals(DD.Start())))
     return x, y
 end
 function provtoyax(prov, zoom, mode=:band)
