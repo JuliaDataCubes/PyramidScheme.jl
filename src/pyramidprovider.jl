@@ -7,8 +7,8 @@ struct PyramidProvider{P<:Pyramid{T} where T} <: TileProviders.AbstractProvider
     p::P
     min_zoom::Int
     max_zoom::Int
-    data_min::T
-    data_max::T
+    data_min::Float64
+    data_max::Float64
     colorscheme::Symbol
     nodatacolor::RGB{Float64}
 end
