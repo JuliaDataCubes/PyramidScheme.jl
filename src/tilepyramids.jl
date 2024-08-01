@@ -24,9 +24,9 @@ function MapTileDiskArray(prov, zoom, mode=:band)
         error("Unknown color type $et")
     end
     if mode === :band
-        return MapTileDiskArray{rgbeltype(et),3,typeof(prov)}(prov, zoom, size(testtile, 1), nband)
+        return MapTileDiskArray{rgbeltype(et),3,typeof(prov)}(prov, zoom, size(testtile), nband)
     elseif mode === :rgb
-        return MapTileDiskArray{et,2,typeof(prov)}(prov, zoom, size(testtile, 1), nband)
+        return MapTileDiskArray{et,2,typeof(prov)}(prov, zoom, size(testtile), nband)
     else
         error("Unknown mode $mode")
     end
