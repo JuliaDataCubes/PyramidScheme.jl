@@ -3,16 +3,16 @@ import Colors: RGB
 import HTTP
 import FileIO: save, Stream, @format_str
 
-struct PyramidProvider{P<:Pyramid} <: TileProviders.AbstractProvider
+struct PyramidProvider{P<:Pyramid{T}} where {T<:TileProviders.AbstractProvider}
     p::P
     min_zoom::Int
     max_zoom::Int
-    data_min::Float64
+    data_min::T
     data_max::Float64
     colorscheme::Symbol
     nodatacolor::RGB{Float64}
 end
-PyramidProvider(p::Pyramid, data_min, data_max; min_zoom=0, max_zoom=15, colorscheme=:viridis, nodatacolor=RGB{Float64}(1.0, 1.0, 1.0)) =
+PyramidProvider(p::Pyramid, data_min, data_max; min_zoom=0, max_zoom=nlevels(p), colorscheme=:viridis, nodatacolor=RGB{Float64}(1.0, 1.0, 1.0)) =
     PyramidProvider(p, min_zoom, max_zoom, data_min, data_max, colorscheme, nodatacolor)
 
 function selectlevel_tile(pyramid, ext; target_imsize=(256, 256))

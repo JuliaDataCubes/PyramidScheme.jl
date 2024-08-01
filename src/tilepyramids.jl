@@ -79,8 +79,8 @@ function dimsfromzoomlevel(zoom, tilesize)
     y1, y2 = first(ex1.Y), last(ex2.Y)
     stepx = (x2 - x1) / npix
     stepy = (y2 - y1) / npix
-    x = X(range(x1 + stepx / 2, x2 - stepx / 2, length=npix))
-    y = Y(range(y1 + stepy / 2, y2 - stepy / 2, length=npix))
+    x = X(DD.Sampled(range(x1, x2 - stepx, length=npix), sampling=DD.Intervals(DD.Start())))
+    y = Y(DD.Sampled(range(y1, y2 - stepy, length=npix), sampling=DD.Intervals(DD.Start())))
     return x, y
 end
 function provtoyax(prov, zoom, mode=:band)
