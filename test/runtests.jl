@@ -33,7 +33,7 @@ end
     using DimensionalData
     using PyramidScheme: PyramidScheme as PS
     using CairoMakie
-    data = zeros(2000,2000)
+    data = rand(2000,2000)
     dd = DimArray(data, (X(1:2000), Y(1:2000)))
     pyramid = PS.Pyramid(dd)
     #@test PS.nlevels(pyramid) == 2
@@ -110,10 +110,12 @@ end
 @testitem "tilepyramid" begin
     using TileProviders
     using DimensionalData
+    using FixedPointNumbers
     prov = OpenStreetMap()
     pyr = Pyramid(prov)
     @test size(pyr.levels[end]) == (3,256,256)
     @test PyramidScheme.nlevels(pyr) == 19
+    @test collect(pyr.levels[end][:,1,1]) == [ 0.667N0f8, 0.827N0f8, 0.875N0f8]
     pyrrgb = Pyramid(prov, :rgb)
     @test size(pyrrgb.levels[end]) == (256,256)
     @test PyramidScheme.nlevels(pyrrgb) == 19
