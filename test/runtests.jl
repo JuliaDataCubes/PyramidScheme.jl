@@ -121,6 +121,21 @@ end
     @test PyramidScheme.nlevels(pyrrgb) == 19
 end
 
+@testitem "pyramidprovider" begin
+    using TileProviders
+    using YAXArrays
+    using HTTP
+    using PyramidScheme
+    using DimensionalData
+    a = rand(1500, 1524)
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
+    pyramid = Pyramid(yax)
+    data_min, data_max = extrema(a)
+    pyrprov = PyramidScheme.PyramidProvider(pyramid, data_min, data_max)
+    HTTP.serve(pyrprov, port=8080)    
+end
+
+
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
