@@ -136,6 +136,6 @@ end
     @time "Building world pyramid" pyr = Pyramid(c)
     @test pyr isa Pyramid 
     @test length(dims(pyr)) == 3
-    @test size(pyr.levels)[end] = (256,128,3)
+    @test size(pyr.levels)[end] == (256,128,3)
     
 end
