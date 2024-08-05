@@ -223,13 +223,13 @@ function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=
     sizeperm = [DD.dimnum(data, input_axes)..., DD.dimnum(data, nonpyramiddims)...]
     permute!(allsizes, sizeperm)
     @show allsizes
-    outputs = if outtype == :zarr
-        [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
-    elseif outtype == :mem
-        outmin = output_arrays(pyramid_sizes, t)
-    else
-        throw(ArgumentError("Output type not valied got $outtype expected :mem or :zarr"))
-    end
+    #outputs = if outtype == :zarr
+    #    [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
+    #elseif outtype == :mem
+    #    output_arrays(pyramid_sizes, t)
+    #else
+    #    throw(ArgumentError("Output type not valid got $outtype, but expected :mem or :zarr"))
+    #end
 
     verbose && println("Start computation")
     n_level = length(outputs)
@@ -238,9 +238,11 @@ function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=
     @show size.(outputs)
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
+    # What is tmp_sizes supposed to be? 
+    # Does this have to be 
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
     windows = arraywindows(allsizes,pixel_base_size)
-    ia  = InputArray(data;windows)
+    ia  = InputArray(data;windows = Tuple(windows))
 
     oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
 
@@ -284,9 +286,10 @@ Construct a list of `RegularWindows` for the size list in `s` for windows `w`.
 function arraywindows(s,w)
     @show s
     @show w
-    map(s) do l
+    windows = map(s) do l
         RegularWindows(1,l,window=w)
     end
+    windows
 end
 
 
@@ -400,15 +403,16 @@ This returns the data of the pyramids and the dimension values of the aggregated
 """
 function getpyramids(reducefunc, ras;recursive=true)
     input_axes = pyramidedaxes(ras)
-    n_level = compute_nlevels(ras)            
+    n_level = compute_nlevels(length.(input_axes))         
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
         [ras], [dims(ras)]
     end 
-    pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
-    pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-
+    pyramid_axes = [map(x-> in(x, input_axes) ? agg_axis(x, 2^l) : x , DD.dims(ras)) for l in 1:n_level]
+    pyramid_sizes = size.(pyramid_axes)
+    @show pyramid_sizes
     outmin = output_arrays(pyramid_sizes, Float32)
+    @show size.(outmin)
     fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
 
     outmin, pyramid_axes
