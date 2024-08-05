@@ -209,7 +209,7 @@ This is an optimization which for functions like median might lead to misleading
 """
 function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=false, outtype=:mem, kwargs...)
     t = typeof(func(zeros(eltype(data), 2,2)))
-    n_level = compute_nlevels(data)            
+    n_level = compute_nlevels(size(data))            
     input_axes = pyramidedaxes(data)
     nonpyramiddims = DD.otherdims(data, input_axes)
     @show nonpyramiddims
@@ -293,9 +293,9 @@ end
 """
     compute_nlevels(data, tilesize=1024)
 
-Compute the number of levels for the aggregation based on the size of `data`.
+Compute the number of levels for the aggregation based on the tuple `datasize`.
 """
-compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
+compute_nlevels(datasize, tilesize=256) = max(0,ceil(Int,log2(maximum(datasize)/tilesize)))
 
 function agg_axis(d,n)
     # TODO this might be problematic for explicitly set axes
