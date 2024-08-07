@@ -218,9 +218,9 @@ function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=
     verbose && println("Constructing output arrays")
     spatialsize = size(data)[collect(DD.dimnum(data, input_axes))]
     pyramid_sizes =  [ceil.(Int, spatialsize ./ 2^i) for i in 1:n_level]
-    allsizes = [spatialsize..., [1 for o in nonpyramiddims]...]
+    allsizes = [spatialsize...,]
     sizeperm = [DD.dimnum(data, input_axes)..., DD.dimnum(data, nonpyramiddims)...]
-    permute!(allsizes, sizeperm)
+    #permute!(allsizes, sizeperm)
     @show allsizes
     #outputs = if outtype == :zarr
     #    [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
@@ -240,17 +240,32 @@ function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=
     # What is tmp_sizes supposed to be? 
     # Does this have to be 
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
-    windows = arraywindows(allsizes,pixel_base_size)
+    windows = Any[Base.OneTo.(size(data))...]
+    #pseudocode
+    windows[DD.dimnum(data, XDim)] = RegularWindows(1,size(data, XDim),window=pixel_base_size)
+    windows[DD.dimnum(data, YDim)] = RegularWindows(1,size(data, YDim),window=pixel_base_size)
+@show size.(windows)
+
     ia  = InputArray(data;windows = Tuple(windows))
+        # Replace 
+    function outwindows(i, outputs, tmpsize)
+        outwins = Any[Base.OneTo.(size(data))...]
+        outwins[DD.dimnum(outputs[i], XDim)] = RegularWindows(1,size(outputs[i], XDim),window=pixel_base_size)
+        outwins[DD.dimnum(outputs[i], YDim)] = RegularWindows(1,size(outputs[i], YDim),window=pixel_base_size)
+        Tuple(outwins)
+    end
 
-    oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
+    for i in 1:1
+    @show outwindows(1, outputs, tmp_sizes[i])
+    end
 
+    oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = outwindows(i,outputs, tmp_sizes[i])),n_level)
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
-    r = runner(op,lr,outputs;kwargs...)
+    r = runner(op,lr,getproperty.(outputs, :data);kwargs...)
     run(r)
 end
 
