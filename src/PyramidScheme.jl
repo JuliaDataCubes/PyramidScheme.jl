@@ -45,8 +45,7 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
 end
 
 function Pyramid(data::DD.AbstractDimArray)
-    pyrdata, pyraxs = getpyramids(mean ∘ skipmissing, data, recursive=false)
-    levels = DD.DimArray.(pyrdata, pyraxs)
+    levels = getpyramids(mean ∘ skipmissing, data, recursive=false)
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
     Pyramid(data, levels, meta)
@@ -413,9 +412,10 @@ function getpyramids(reducefunc, ras;recursive=true)
     @show pyramid_sizes
     outmin = output_arrays(pyramid_sizes, Float32)
     @show size.(outmin)
-    fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
+    levels = DD.DimArray.(outmin, pyramid_axes)
+    fill_pyramids(ras,levels,reducefunc,recursive; threaded=true)
 
-    outmin, pyramid_axes
+    levels
 end
 
 """
