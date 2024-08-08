@@ -45,9 +45,9 @@ end
 end
 @testitem "Helper functions" begin
     using PyramidScheme: PyramidScheme as PS
-    @test PS.compute_nlevels(zeros(1000)) == 2
-    @test PS.compute_nlevels(zeros(1000,1025)) == 3
-    @test PS.compute_nlevels(zeros(10000, 8000)) == 6
+    @test PS.compute_nlevels((1000,)) == 2
+    @test PS.compute_nlevels((1000,1025)) == 3
+    @test PS.compute_nlevels((10000, 8000)) == 6
 end
 
 @testitem "ArchGDAL Loading of Geotiff Overviews" begin
@@ -129,6 +129,7 @@ end
     using YAXArrays
     using Zarr
     using PyramidScheme
+    using DimensionalData
     orgpath = joinpath(@__DIR__, "data", "world.zarr")
     path = tempname() * ".zarr"
     cp(orgpath, path)
