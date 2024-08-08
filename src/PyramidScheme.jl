@@ -250,14 +250,11 @@ function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=
         # Replace 
     function outwindows(i, outputs, tmpsize)
         outwins = Any[Base.OneTo.(size(data))...]
-        outwins[DD.dimnum(outputs[i], XDim)] = RegularWindows(1,size(outputs[i], XDim),window=pixel_base_size)
-        outwins[DD.dimnum(outputs[i], YDim)] = RegularWindows(1,size(outputs[i], YDim),window=pixel_base_size)
+        outwins[DD.dimnum(outputs[i], XDim)] = RegularWindows(1,size(outputs[i], XDim),window=tmpsize)
+        outwins[DD.dimnum(outputs[i], YDim)] = RegularWindows(1,size(outputs[i], YDim),window=tmpsize)
         Tuple(outwins)
     end
 
-    for i in 1:1
-    @show outwindows(1, outputs, tmp_sizes[i])
-    end
 
     oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = outwindows(i,outputs, tmp_sizes[i])),n_level)
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
@@ -331,7 +328,7 @@ function gen_output(t,s; path=tempname())
     if outsize > 100e6
         # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
         # Dummy dataset with FillArrays with the shape of the pyramidlevel
-        zcreate(t,s...;path,chunks = (1024,1024),fill_value=zero(t))
+        zcreate(t,s...;path,chunks=ntuple(i->min(256, s[i]), length(s)),fill_value=zero(t))
     else
         zeros(t,s...)
     end
