@@ -1,0 +1,153 @@
+---
+engine: julia
+title: "PyramidScheme.jl \n  interactively plotting large raster data"
+author: "Felix Cremer, Fabian Gans"
+format: revealjs
+execute:
+    echo: true
+---
+
+## What are pyramids?
+
+```{julia}
+#| echo: false
+using WGLMakie
+using PyramidScheme
+using DimensionalData.Dimensions
+using DimensionalData
+using Extents
+@dim lat YDim "Latitude"
+@dim lon XDim "Longitude"
+replacenan(data) =  data <= 0 ? NaN32 : Float32(data)
+fullpyr = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr/")))
+europe= Extent(lon=(-10.0,35.0),lat=(33.0,70.0))
+europyr = Pyramid(fullpyr.base[lon = Between(europe.lon...), lat=Between(europe.lat...)], [l[lon = Between(europe.lon...), lat=Between(europe.lat...)] for l in fullpyr.levels], metadata(fullpyr))
+
+lim = Extent(X = (-63.36854472609895, -57.18529373390659), Y = (-2.666626089016638, -1.9161481184310643))
+subpyr = Pyramid(fullpyr.levels[3][lon = Between(lim.X...), lat=Between(lim.Y...)], [l[lon = Between(lim.X...), lat=Between(lim.Y...)] for l in fullpyr.levels[4:7]], metadata(fullpyr))
+function plotpyramid(fullpyr) 
+ps = Pyramid(fullpyr.levels[end-2], fullpyr.levels[end-1:end], metadata(fullpyr))
+n=4
+levelsizes = collect(size.(PyramidScheme.levels(ps)))
+numlevels = PyramidScheme.nlevels(ps)
+offsets = [(0.,0.)]
+for i in 1:numlevels
+    s = size(PyramidScheme.levels(ps, i)) ./2
+    push!(offsets, offsets[i] .+ s)
+end
+
+
+
+    fig = Figure()
+    #globax = Axis(fig[1,1])
+    #plot!(globax, fullpyr, colormap=:speed, colorscale=sqrt)
+    ax = Axis3(fig[1:2,1])
+
+    for (i, offset) in enumerate(offsets)
+        axn = Axis(fig[3-i,2])
+        l = levelsizes[i]
+        x = first(offset):(first(offset)+first(l)-1)
+        y = last(offset):last(offset) + last(l)-1
+        r = Rect3(Point3f( offset..., 2*i), Vec3f(l..., 1))
+        mesh!(ax, r, color=:grey80)
+        heatmap!(ax, reverse(x), y,PyramidScheme.levels(ps,i-1), transformation=(:xy, 2*i+1.2), colormap=:speed, colorscale=sqrt)
+        heatmap!(axn, PyramidScheme.levels(ps, i-1), colormap=:speed, colorscale=sqrt)
+        hidexdecorations!(axn)
+        axn.aspect = DataAspect()
+end
+hidedecorations!(ax)
+hidespines!(ax)
+colsize!(fig.layout, 2, Relative(0.3))
+fig
+end
+
+plotpyramid(europyr)
+```
+
+
+## Compute the pyramids for your data
+- In Memory data
+
+```{julia}
+#|  eval: false
+using Rasters
+using RasterDataSources
+ras = Raster(WorldClim{Elevation},:elev, res="30s", lazy=true)
+pyr = Pyramid(ras, resampling_method=mean)
+Progress: 100%|████████████████████████████████████████████| Time: 0:00:47
+```
+
+- Larger data on disk
+
+```{julia}
+#| eval: false
+using YAXArrays
+elevpath = getraster(WorldClim{Elevation},:elev, res="30s")
+elev = Cube(elevpath)
+zarrpath = tempname() * ".zarr"
+savecube(elev, zarrpath)
+PyramidScheme.buildpyramids(zarrpath)
+```
+
+## Access Pyramiddata
+
+- Zarr data
+- Geotiff
+- Locally or in the cloud
+```{julia}
+agb2020 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr/")))
+```
+
+# Interactive visualisation
+
+```{julia}
+#|  eval: false
+plot(agb2020, colormap=:speed, colorscale=sqrt)
+```
+
+# Computations on Pyramids
+```{julia}
+#|  eval: false
+replacenan(data) =  data <= 0 ? NaN32 : Float32(data)
+agb2020 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr/")))
+agb2017 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2017-fv4.0.zarr/")))
+agbdiff = agb2020 .- agb2017
+plot(agbdiff, colormap=:bukavu, colorrange=(-200, 200))
+```
+
+
+# Outlook 
+
+- pyramids in multiple dimensions
+
+- Understanding more formats
+
+- Integrate DiskArrayEngine computations
+
+- Open it up to more use cases
+
+```{julia}
+#|  eval:false
+using YAXArrays, PyramidScheme
+using GLMakie
+import PyramidScheme as PS
+using DiskArrays
+import DimensionalData as DD
+using DimensionalData.Dimensions
+@dim lat YDim "Latitude"
+@dim lon XDim "Longitude"
+
+p2020 = PS.Pyramid("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
+function DiskArrays.cache(a::YAXArray;maxsize=1000)
+    DD.rebuild(a,DiskArrays.cache(a.data;maxsize))
+end
+function DiskArrays.cache(p::Pyramid;maxsize = 1000)
+    maxsize = maxsize ÷ (length(p.levels)+1)
+    Pyramid(DiskArrays.cache(p.base;maxsize),DiskArrays.cache.(p.levels;maxsize),p.metadata)
+end
+p2020 = DiskArrays.cache(p2020)
+
+replacenan(nanval) =  data -> <=(nanval)(data) ? NaN32 : Float32(data)
+p2020nan = replacenan(0).(p2020)
+plot(p2020nan, colormap=:speed, colorscale=sqrt)
+```
