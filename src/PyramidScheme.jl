@@ -305,7 +305,7 @@ end
 
 
 """
-    compute_nlevels(data, tilesize=1024)
+    compute_nlevels(data, tilesize=256)
 
 Compute the number of levels for the aggregation based on the tuple `datasize`.
 """
@@ -370,6 +370,15 @@ function buildpyramids(path; resampling_method=mean, recursive=true, runner=Loca
     # Build a loop for all variables in a dataset?
     org = Cube(path)
     # We run the method once to derive the output type
+    t = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    n_level = compute_nlevels(org)            
+    input_axes = filter(x-> x isa SpatialDim,  DD.dims(org))
+    if length(input_axes) != 2
+        throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
+    end
+    verbose && println("Constructing output arrays")
+    outarrs = [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
+    verbose && println("Start computation")
     fill_pyramids(org, outarrs, resampling_method, recursive;runner)
     pyraxs = [agg_axis.(input_axes, 2^n) for n in 1:n_level]
     pyrlevels = DD.DimArray.(outarrs, pyraxs)
