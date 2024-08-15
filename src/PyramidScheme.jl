@@ -24,6 +24,7 @@ using Proj
 using Makie: Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, Relative
 using Makie: on, heatmap!, image!
 import MakieCore: plot, plot!
+import DiskArrays: cache
 using OffsetArrays
 
 using Statistics
@@ -289,6 +290,11 @@ function gen_output(t,s; path=tempname())
         zeros(t,s...)
     end
 end
+
+function cache(p::Pyramid; maxsize=1000)
+    maxsize = maxsize ÷ (length(p.levels) + 1)
+    Pyramid(cache(p.base; maxsize), cache.(p.levels; maxsize), p.metadata)
+end
 function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray) 
     dataengine = engine(dimarr.data)
     DD.rebuild(dimarr, data=dataengine)
@@ -526,6 +532,8 @@ function tms_json(pyramid)
 end
 
 include("broadcast.jl")
+include("pyramidprovider.jl")
+include("tilepyramids.jl")
 
 
 end
