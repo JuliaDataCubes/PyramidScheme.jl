@@ -25,6 +25,9 @@ europyr = Pyramid(fullpyr.base[lon = Between(europe.lon...), lat=Between(europe.
 
 lim = Extent(X = (-63.36854472609895, -57.18529373390659), Y = (-2.666626089016638, -1.9161481184310643))
 subpyr = Pyramid(fullpyr.levels[3][lon = Between(lim.X...), lat=Between(lim.Y...)], [l[lon = Between(lim.X...), lat=Between(lim.Y...)] for l in fullpyr.levels[4:7]], metadata(fullpyr))
+```
+
+```{julia}
 function plotpyramid(fullpyr) 
 ps = Pyramid(fullpyr.levels[end-2], fullpyr.levels[end-1:end], metadata(fullpyr))
 n=4
@@ -41,22 +44,22 @@ end
     fig = Figure()
     #globax = Axis(fig[1,1])
     #plot!(globax, fullpyr, colormap=:speed, colorscale=sqrt)
-    ax = Axis3(fig[1:2,1])
+    ax = LScene(fig[1:2,1], show_axis=false)
 
     for (i, offset) in enumerate(offsets)
         axn = Axis(fig[3-i,2])
         l = levelsizes[i]
         x = first(offset):(first(offset)+first(l)-1)
         y = last(offset):last(offset) + last(l)-1
-        r = Rect3(Point3f( offset..., 2*i), Vec3f(l..., 1))
-        mesh!(ax, r, color=:grey80)
-        heatmap!(ax, reverse(x), y,PyramidScheme.levels(ps,i-1), transformation=(:xy, 2*i+1.2), colormap=:speed, colorscale=sqrt)
+        r = Rect3(Point3f( offset..., 7*i), Vec3f(l..., 5))
+        mesh!(ax, r, color=PyramidScheme.levels(ps, i-1)[:,end:-1:begin], colormap=:speed, nan_color=:grey80)
+        #heatmap!(ax, reverse(x), y,PyramidScheme.levels(ps,i-1), transformation=(:xy, 2*i+1.2), colormap=:speed, colorscale=sqrt)
         heatmap!(axn, PyramidScheme.levels(ps, i-1), colormap=:speed, colorscale=sqrt)
         hidexdecorations!(axn)
         axn.aspect = DataAspect()
 end
-hidedecorations!(ax)
-hidespines!(ax)
+#hidedecorations!(ax)
+#hidespines!(ax)
 colsize!(fig.layout, 2, Relative(0.3))
 fig
 end
