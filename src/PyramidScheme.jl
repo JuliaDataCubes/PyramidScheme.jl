@@ -261,7 +261,7 @@ end
 
 
 """
-    compute_nlevels(data, tilesize=1024)
+    compute_nlevels(data, tilesize=256)
 
 Compute the number of levels for the aggregation based on the size of `data`.
 """
@@ -374,9 +374,9 @@ end
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
     input_axes = DD.dims(ras)
-    n_level = compute_nlevels(ras)            
+    n_level = compute_nlevels(ras, tilesize)            
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
         [ras], [dims(ras)]
