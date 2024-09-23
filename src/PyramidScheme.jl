@@ -45,8 +45,7 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
 end
 
 function Pyramid(data::DD.AbstractDimArray; resampling_method=mean ∘ skipmissing, kwargs...)
-    pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
-    levels = DD.DimArray.(pyrdata, pyraxs)
+    levels = getpyramids(resampling_method, data; kwargs...)
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
     Pyramid(data, levels, meta)
