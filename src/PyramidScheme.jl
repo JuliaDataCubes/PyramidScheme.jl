@@ -338,9 +338,9 @@ function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray)
 end
 DiskArrayEngine.engine(pyr::Pyramid) = Pyramid(engine(parent(pyr)), engine.(pyr.levels), DD.metadata(pyr))
 """
-    output_arrays(pyramid_sizes)
+    output_arrays(pyramid_sizes, T)
 
-Create the output arrays for the given `pyramid_sizes`
+Create the output arrays for the given `pyramid_sizes` with the element type T.
 """
 output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 
@@ -430,7 +430,9 @@ function getpyramids(reducefunc, ras;recursive=true)
     pyramid_axes = [map(x-> in(x, input_axes) ? agg_axis(x, 2^l) : x , DD.dims(ras)) for l in 1:n_level]
     pyramid_sizes = size.(pyramid_axes)
     @show pyramid_sizes
-    outmin = output_arrays(pyramid_sizes, Float32)
+    t = typeof(reducefunc(zeros(eltype(ras), 2,2)))
+
+    outmin = output_arrays(pyramid_sizes, t)
     @show size.(outmin)
     levels = DD.DimArray.(outmin, pyramid_axes)
     fill_pyramids(ras,levels,reducefunc,recursive; threaded=true)
