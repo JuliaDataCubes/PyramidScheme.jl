@@ -1,2 +1,4 @@
 /Manifest.toml
 test/data
+docs/.quarto
+docs/presentation_files

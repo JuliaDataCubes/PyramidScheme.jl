@@ -1,11 +1,22 @@
 ---
-engine: julia
 title: "PyramidScheme.jl \n  interactively plotting large raster data"
 author: "Felix Cremer, Fabian Gans"
 format: revealjs
+engine: julia
 execute:
     echo: true
 ---
+
+## Why use pyramids?
+
+julia> agbdiffbase = agb2020 .- agb2017
+
+╭───────────────────────────────────╮
+
+│ 405000×157500 YAXArray{Float32,2} │
+
+- julia> savecube(agbdiffbase, tempname()*".zarr")
+Progress:   1%|▍                                                               |  ETA: 3:15:43
 
 ## What are pyramids?
 
@@ -65,11 +76,12 @@ plotpyramid(europyr)
 ```
 
 
+
 ## Compute the pyramids for your data
 - In Memory data
 
 ```{julia}
-#|  eval: false
+#| eval: false
 using Rasters
 using RasterDataSources
 ras = Raster(WorldClim{Elevation},:elev, res="30s", lazy=true)
@@ -101,13 +113,13 @@ agb2020 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-
 # Interactive visualisation
 
 ```{julia}
-#|  eval: false
+#| eval: false
 plot(agb2020, colormap=:speed, colorscale=sqrt)
 ```
 
 # Computations on Pyramids
 ```{julia}
-#|  eval: false
+#| eval: false
 replacenan(data) =  data <= 0 ? NaN32 : Float32(data)
 agb2020 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr/")))
 agb2017 = replacenan.(Pyramid(joinpath(@__DIR__,"..", "test/data/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2017-fv4.0.zarr/")))
@@ -118,16 +130,19 @@ plot(agbdiff, colormap=:bukavu, colorrange=(-200, 200))
 
 # Outlook 
 
-- pyramids in multiple dimensions
+- pyramids in multiple dimensions (WIP)
 
 - Understanding more formats
+
+- Expose data as WMTS/WMS for online usage
 
 - Integrate DiskArrayEngine computations
 
 - Open it up to more use cases
 
+## Example of cloud access
 ```{julia}
-#|  eval:false
+#| eval: false
 using YAXArrays, PyramidScheme
 using GLMakie
 import PyramidScheme as PS

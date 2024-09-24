@@ -1785,7 +1785,7 @@ uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
 version = "1.2.0"
 
 [[deps.PyramidScheme]]
-deps = ["Colors", "DimensionalData", "DiskArrayEngine", "DiskArrayTools", "DiskArrays", "Extents", "FillArrays", "GeoInterface", "Makie", "MakieCore", "Observables", "OffsetArrays", "Proj", "Statistics", "WGLMakie", "YAXArrayBase", "YAXArrays", "Zarr"]
+deps = ["Colors", "DimensionalData", "DiskArrayEngine", "DiskArrayTools", "DiskArrays", "Extents", "FillArrays", "GeoInterface", "Makie", "MakieCore", "Observables", "OffsetArrays", "Proj", "Statistics", "YAXArrayBase", "YAXArrays", "Zarr"]
 path = ".."
 uuid = "ec211b67-1c2c-4319-878f-eaee078ee145"
 version = "0.1.0"

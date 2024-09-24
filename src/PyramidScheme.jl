@@ -45,8 +45,7 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
 end
 
 function Pyramid(data::DD.AbstractDimArray; resampling_method=mean ∘ skipmissing, kwargs...)
-    pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
-    levels = DD.DimArray.(pyrdata, pyraxs)
+    levels = getpyramids(resampling_method, data; kwargs...)
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
     Pyramid(data, levels, meta)
@@ -206,22 +205,63 @@ Fill the pyramids generated from the `data` with the aggregation function `func`
 `recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
 This is an optimization which for functions like median might lead to misleading results.
 """
-function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, kwargs...)
+function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, verbose=false, outtype=:mem, kwargs...)
+    t = typeof(func(zeros(eltype(data), 2,2)))
+    n_level = compute_nlevels(size(data))            
+    input_axes = pyramidedaxes(data)
+    nonpyramiddims = DD.otherdims(data, input_axes)
+    @show nonpyramiddims
+    if length(input_axes) != 2
+        throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
+    end
+    verbose && println("Constructing output arrays")
+    spatialsize = size(data)[collect(DD.dimnum(data, input_axes))]
+    pyramid_sizes =  [ceil.(Int, spatialsize ./ 2^i) for i in 1:n_level]
+    allsizes = [spatialsize...,]
+    sizeperm = [DD.dimnum(data, input_axes)..., DD.dimnum(data, nonpyramiddims)...]
+    #permute!(allsizes, sizeperm)
+    @show allsizes
+    #outputs = if outtype == :zarr
+    #    [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
+    #elseif outtype == :mem
+    #    output_arrays(pyramid_sizes, t)
+    #else
+    #    throw(ArgumentError("Output type not valid got $outtype, but expected :mem or :zarr"))
+    #end
+
+    verbose && println("Start computation")
     n_level = length(outputs)
+    @show typeof(data)
+    @show n_level
+    @show size.(outputs)
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
+    # What is tmp_sizes supposed to be? 
+    # Does this have to be 
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
+    windows = Any[Base.OneTo.(size(data))...]
+    #pseudocode
+    windows[DD.dimnum(data, XDim)] = RegularWindows(1,size(data, XDim),window=pixel_base_size)
+    windows[DD.dimnum(data, YDim)] = RegularWindows(1,size(data, YDim),window=pixel_base_size)
+@show size.(windows)
 
-    ia  = InputArray(data, windows = arraywindows(size(data),pixel_base_size))
+    ia  = InputArray(data;windows = Tuple(windows))
+        # Replace 
+    function outwindows(i, outputs, tmpsize)
+        outwins = Any[Base.OneTo.(size(data))...]
+        outwins[DD.dimnum(outputs[i], XDim)] = RegularWindows(1,size(outputs[i], XDim),window=tmpsize)
+        outwins[DD.dimnum(outputs[i], YDim)] = RegularWindows(1,size(outputs[i], YDim),window=tmpsize)
+        Tuple(outwins)
+    end
 
-    oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
 
+    oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = outwindows(i,outputs, tmp_sizes[i])),n_level)
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
 
     op = GMDWop((ia,), oa, func)
 
     lr = DiskArrayEngine.optimize_loopranges(op,5e8,tol_low=0.2,tol_high=0.05,max_order=2)
-    r = runner(op,lr,outputs;kwargs...)
+    r = runner(op,lr,getproperty.(outputs, :data);kwargs...)
     run(r)
 end
 
@@ -254,18 +294,21 @@ Construct a list of `RegularWindows` for the size list in `s` for windows `w`.
 ??
 """
 function arraywindows(s,w)
-    map(s) do l
+    @show s
+    @show w
+    windows = map(s) do l
         RegularWindows(1,l,window=w)
     end
+    windows
 end
 
 
 """
-    compute_nlevels(data, tilesize=1024)
+    compute_nlevels(data, tilesize=256)
 
-Compute the number of levels for the aggregation based on the size of `data`.
+Compute the number of levels for the aggregation based on the tuple `datasize`.
 """
-compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
+compute_nlevels(datasize, tilesize=256) = max(0,ceil(Int,log2(maximum(datasize)/tilesize)))
 
 function agg_axis(d,n)
     # TODO this might be problematic for explicitly set axes
@@ -284,7 +327,7 @@ function gen_output(t,s; path=tempname())
     if outsize > 100e6
         # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
         # Dummy dataset with FillArrays with the shape of the pyramidlevel
-        zcreate(t,s...;path,chunks = (1024,1024),fill_value=zero(t))
+        zcreate(t,s...;path,chunks=ntuple(i->min(256, s[i]), length(s)),fill_value=zero(t))
     else
         zeros(t,s...)
     end
@@ -295,9 +338,9 @@ function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray)
 end
 DiskArrayEngine.engine(pyr::Pyramid) = Pyramid(engine(parent(pyr)), engine.(pyr.levels), DD.metadata(pyr))
 """
-    output_arrays(pyramid_sizes)
+    output_arrays(pyramid_sizes, T)
 
-Create the output arrays for the given `pyramid_sizes`
+Create the output arrays for the given `pyramid_sizes` with the element type T.
 """
 output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 
@@ -306,6 +349,9 @@ output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
 Union of Dimensions which are assumed to be in space and are therefore used in the pyramid building. 
 """
 SpatialDim = Union{DD.Dimensions.XDim, DD.Dimensions.YDim}
+
+pyramidedaxes(input) = filter(x-> x isa SpatialDim,  DD.dims(input))
+
 
 """
     buildpyramids(path; resampling_method=mean)
@@ -375,19 +421,23 @@ Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
 function getpyramids(reducefunc, ras;recursive=true)
-    input_axes = DD.dims(ras)
-    n_level = compute_nlevels(ras)            
+    input_axes = pyramidedaxes(ras)
+    n_level = compute_nlevels(length.(input_axes))         
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
         [ras], [dims(ras)]
     end 
-    pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
-    pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
+    pyramid_axes = [map(x-> in(x, input_axes) ? agg_axis(x, 2^l) : x , DD.dims(ras)) for l in 1:n_level]
+    pyramid_sizes = size.(pyramid_axes)
+    @show pyramid_sizes
+    t = typeof(reducefunc(zeros(eltype(ras), 2,2)))
 
-    outmin = output_arrays(pyramid_sizes, Float32)
-    fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
+    outmin = output_arrays(pyramid_sizes, t)
+    @show size.(outmin)
+    levels = DD.DimArray.(outmin, pyramid_axes)
+    fill_pyramids(ras,levels,reducefunc,recursive; threaded=true)
 
-    outmin, pyramid_axes
+    levels
 end
 
 """
