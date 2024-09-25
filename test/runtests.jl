@@ -43,6 +43,17 @@ end
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
 end
+
+@testitem "Pyramid building RGB eltype" begin
+    using PyramidScheme: PyramidScheme as PS
+    using Colors
+    data = rand(RGB, 2000,2000)
+    dd = DimArray(data, (X(1:2000), Y(1:2000)))
+    pyramid = PS.Pyramid(dd)
+
+
+end
+
 @testitem "Helper functions" begin
     using PyramidScheme: PyramidScheme as PS
     @test PS.compute_nlevels(zeros(1000)) == 2
@@ -106,6 +117,7 @@ end
     @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
 
 end
+
 
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin

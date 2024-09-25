@@ -280,7 +280,6 @@ If the array is smaller than 10e6 it is created on disk and otherwise as a tempo
 function gen_output(t,s; path=tempname())
     # This should be dispatching on the output type whether it is internal or external
     outsize = sizeof(t)*prod(s)
-    z = Zeros(t, s...)
     if outsize > 100e6
         # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
         # Dummy dataset with FillArrays with the shape of the pyramidlevel
@@ -383,8 +382,8 @@ function getpyramids(reducefunc, ras;recursive=true)
     end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-
-    outmin = output_arrays(pyramid_sizes, Float32)
+    outtype = typeof(reducefunc(rand(eltype(ras),2,2)))
+    outmin = output_arrays(pyramid_sizes, outtype)
     fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
 
     outmin, pyramid_axes
