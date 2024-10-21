@@ -64,7 +64,7 @@ function Pyramid(path::AbstractString, backend)
 end
 function _pyramid_gdal end
 
-function _pyramid_zarr(path)
+function _load_pyramid(path, backend)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
     base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
