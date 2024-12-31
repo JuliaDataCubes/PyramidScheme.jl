@@ -45,6 +45,7 @@ end
 end
 
 @testitem "Pyramid building RGB eltype" begin
+    using DimensionalData
     using PyramidScheme: PyramidScheme as PS
     using Colors
     data = rand(RGB, 2000,2000)
