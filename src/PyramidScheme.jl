@@ -55,9 +55,9 @@ end
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
-    if backend isa YAB.ZarrDataset
+    if (findfirst(x->x==:zarr,[keys(YAB.backendlist)...])!=nothing) && (typeof(backend) == YAB.backendfrompath("test.zarr"))
         _pyramid_zarr(path)
-    elseif backend isa YAB.GDALDataset
+    elseif (findfirst(x->x==:gdal,[keys(YAB.backendlist)...])!=nothing) && (typeof(backend) <: YAB.backendfrompath("test.tif"))
         _pyramid_gdal(path)
     else
         throw(ArgumentError("""
@@ -314,7 +314,8 @@ The data is aggregated with the specified `resampling_method`.
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
 function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
-    if YAB.backendfrompath(path) != YAB.ZarrDataset 
+    # if YAB.backendfrompath(path) != YAB.ZarrDataset 
+    if !(YAB.backendfrompath(path) <: YAB.backendfrompath("test.zarr"))
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
 

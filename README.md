@@ -46,7 +46,8 @@ savecube(elev, zarrpath)
 
 To reproduce the zooming example shown at the top of the README you can get the Above Ground Biomass here or try to load it from the cloud, but this might have some serious lag.
 ```julia
-using YAXArrays, PyramidScheme
+using YAXArrays
+using PyramidScheme:PyramidScheme as PS
 using GLMakie
 p2020 = PS.Pyramid("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
 replacenan(nanval) =  data -> <=(nanval)(data) ? NaN32 : Float32(data)
