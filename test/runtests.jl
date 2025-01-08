@@ -46,6 +46,7 @@ end
 
 @testitem "Pyramid building RGB eltype" begin
     using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
     using Colors
     data = rand(RGB, 2000,2000)
     dd = DimArray(data, (X(1:2000), Y(1:2000)))
