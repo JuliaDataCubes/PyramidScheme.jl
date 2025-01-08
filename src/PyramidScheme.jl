@@ -55,9 +55,9 @@ end
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
-    if backend isa YAB.ZarrDataset
+    if backend isa YAB.backendlist[:zarr]
         _pyramid_zarr(path)
-    elseif backend isa YAB.GDALDataset
+    elseif backend isa YAB.backendlist[:tif]
         _pyramid_gdal(path)
     else
         throw(ArgumentError("""
