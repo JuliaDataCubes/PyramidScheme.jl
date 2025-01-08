@@ -1,13 +1,39 @@
-import Base.Broadcast: Broadcasted, BroadcastStyle
+import Base.Broadcast: Broadcasted, BroadcastStyle, DefaultArrayStyle, AbstractArrayStyle, Style
 
-struct PyramidStyle <:Base.BroadcastStyle end
-Base.BroadcastStyle(::Type{<:Pyramid}) = PyramidStyle()
-Base.BroadcastStyle(::PyramidStyle, ::PyramidStyle) = PyramidStyle()
+struct PyramidStyle{S <: BroadcastStyle} <: AbstractArrayStyle{Any} end
+PyramidStyle(::S) where {S} = PyramidStyle{S}()
+PyramidStyle(::S, ::Val{N}) where {S,N} = PyramidStyle(S(Val(N)))
+PyramidStyle(::Val{N}) where N = PyramidStyle{DefaultArrayStyle{N}}()
+function BroadcastStyle(::Type{<:Pyramid{T,N,D,A, B, L, Me}}) where {T,N,D,A, B, L, Me}
+    inner_style = typeof(BroadcastStyle(B))
+    return PyramidStyle{inner_style}()
+end
 
-function Base.copy(bc::Broadcasted{PyramidStyle})
+function PyramidStyle(a::BroadcastStyle, b::BroadcastStyle)
+    inner_style = BroadcastStyle(a, b)
+    # if the inner style is Unknown then so is the outer style
+    if inner_style isa Unknown
+        return Unknown()
+    else
+        return PyramidStyle(inner_style)
+    end
+end
+
+
+BroadcastStyle(::PyramidStyle, ::Base.Broadcast.Unknown) = Unknown()
+BroadcastStyle(::Base.Broadcast.Unknown, ::PyramidStyle) = Unknown()
+BroadcastStyle(::PyramidStyle{A}, ::PyramidStyle{B}) where {A, B} = PyramidStyle(A(), B())
+BroadcastStyle(::PyramidStyle{A}, b::Style) where {A} = PyramidStyle(A(), b)
+BroadcastStyle(a::Style, ::PyramidStyle{B}) where {B} = PyramidStyle(a, B())
+BroadcastStyle(::PyramidStyle{A}, b::Style{Tuple}) where {A} = PyramidStyle(A(), b)
+BroadcastStyle(a::Style{Tuple}, ::PyramidStyle{B}) where {B} = PyramidStyle(a, B())
+#
+function Base.copy(bc::Broadcasted{<:PyramidStyle})
     bcf = Base.Broadcast.flatten(bc)
     inputs = bcf.args
+    @show typeof.(inputs)
     func = bcf.f
+    @show func
     numlevels = checklevelcompat(inputs)
     newlevels = map(0:numlevels) do l
         argslevel = levels.(inputs, (l,))
