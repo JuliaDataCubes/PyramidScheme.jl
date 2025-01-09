@@ -27,27 +27,27 @@ BroadcastStyle(::PyramidStyle{A}, b::Style) where {A} = PyramidStyle(A(), b)
 BroadcastStyle(a::Style, ::PyramidStyle{B}) where {B} = PyramidStyle(a, B())
 BroadcastStyle(::PyramidStyle{A}, b::Style{Tuple}) where {A} = PyramidStyle(A(), b)
 BroadcastStyle(a::Style{Tuple}, ::PyramidStyle{B}) where {B} = PyramidStyle(a, B())
-#
+BroadcastStyle(a::PyramidStyle, ::DD.DimensionalStyle) = a
+BroadcastStyle(a::PyramidStyle, ::DiskArrays.ChunkStyle) = a
+
 function Base.copy(bc::Broadcasted{<:PyramidStyle})
     bcf = Base.Broadcast.flatten(bc)
-    inputs = bcf.args
-    @show typeof.(inputs)
+    args = bcf.args
     func = bcf.f
-    @show func
-    numlevels = checklevelcompat(inputs)
+    arrs = Flatten.flatten(args, AbstractArray, Pyramid)
+    isempty(arrs) || 
+        throw(ArgumentError("Cannot broadcast a Pyramid with a regular array. Convert your input array to a Pyramid using `Pyramid(array)`"))
+    pyrs = Flatten.flatten(args, Pyramid, Array)
+    numlevels = checklevelcompat(pyrs)
     newlevels = map(0:numlevels) do l
-        argslevel = levels.(inputs, (l,))
-        argdata = getproperty.(argslevel, :data)
-        newdata = func.(argdata...)
-        newdimarr = DD.rebuild(first(argslevel), data=newdata, dims=DD.dims(first(argslevel)))
-        newdimarr
+        pyrslevel = levels.(pyrs, (l,))
+        argslevel = Flatten.reconstruct(args, pyrslevel, Pyramid, Array) 
+        func.(argslevel...)
     end
     #@show typeof(newlevels)
     base = newlevels[1]
     layers = newlevels[2:end]
-    #@show typeof(base)
-    #@show eltype(layers)
-    Pyramid(base, layers, broadcast_metadata(inputs))
+    Pyramid(base, layers, broadcast_metadata(args))
 end
 
 #function Base.copyto!(pyr::Pyramid, bc::Broadcasted{PyramidStyle}) = pyr
