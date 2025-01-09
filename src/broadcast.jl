@@ -1,4 +1,5 @@
 import Base.Broadcast: Broadcasted, BroadcastStyle, DefaultArrayStyle, AbstractArrayStyle, Style
+import Flatten: Flatten
 
 struct PyramidStyle{S <: BroadcastStyle} <: AbstractArrayStyle{Any} end
 PyramidStyle(::S) where {S} = PyramidStyle{S}()

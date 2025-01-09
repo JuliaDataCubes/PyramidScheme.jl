@@ -99,6 +99,15 @@ DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
 DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
 DD.dims(pyramid::Pyramid) = DD.dims(parent(pyramid))
 DD.metadata(pyramid::Pyramid) = pyramid.metadata
+
+function DD.modify(f, pyr::Pyramid)
+    pbase = DD.modify(f, pyr.base)
+    plevels = map(pyr.levels) do level
+        DD.modify(f, level)
+    end
+    Pyramid(pbase, plevels, pyr.metadata)
+end
+Base.read(pyr::Pyramid) = DD.modify(Array, pyr)
 @inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
     Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels, A.metadata)
 end
@@ -313,7 +322,7 @@ The data is aggregated with the specified `resampling_method`.
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
 function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
-    if YAB.backendfrompath(path) != YAB.ZarrDataset 
+    if !isa(YAB.backendfrompath(path),YAB.backendlist[:zarr])
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
 
