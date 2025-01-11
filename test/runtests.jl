@@ -42,6 +42,11 @@ end
     @test size(subpyramid) == (10,10)
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
+
+    @testset "Tilesize" begin
+        pyrtile = PS.Pyramid(dd, tilesize=50)
+        @test maximum(size(pyrtile.levels[end])) < 50
+    end
 end
 
 @testitem "Pyramid building RGB eltype" begin

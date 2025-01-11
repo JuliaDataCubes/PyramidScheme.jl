@@ -261,9 +261,10 @@ end
 
 
 """
-    compute_nlevels(data, tilesize=1024)
+    compute_nlevels(data, tilesize=256)
 
 Compute the number of levels for the aggregation based on the size of `data`.
+`tilesize` gives the maximal size of the coarsest level in all directions.
 """
 compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
@@ -369,13 +370,16 @@ function output_zarr(n, input_axes, t, path)
 end 
 
 """
-    getpyramids(ras)
+    getpyramids(reducefunc, ras; recursive=true, tilesize=256)
 Compute the data of the pyramids of a given data cube `ras`.
+It uses the reduction function `reducefunc` to aggregate the data.
+If `recursive` is true the reduction function is applied on the already reduced layers.
+`tilesize` indicates the maximal size of coarsest layer.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
     input_axes = DD.dims(ras)
-    n_level = compute_nlevels(ras)            
+    n_level = compute_nlevels(ras, tilesize)            
     if iszero(n_level)
         @info "Array is smaller than the tilesize no pyramids are computed"
         [ras], [dims(ras)]
