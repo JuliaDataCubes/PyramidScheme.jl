@@ -446,7 +446,6 @@ function write(path, pyramid::Pyramid; kwargs...)
     
     for (i,l) in enumerate(reverse(pyramid.levels))
         outpath = joinpath(path, string(i-1))
-        @show outpath
         savecube(l,outpath)
     end
 end
