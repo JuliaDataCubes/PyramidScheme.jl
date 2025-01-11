@@ -1,4 +1,4 @@
-import Base.Broadcast: Broadcasted, BroadcastStyle, DefaultArrayStyle, AbstractArrayStyle, Style
+import Base.Broadcast: Broadcasted, BroadcastStyle, DefaultArrayStyle, AbstractArrayStyle, Style, Unknown
 import Flatten: Flatten
 
 struct PyramidStyle{S <: BroadcastStyle} <: AbstractArrayStyle{Any} end
