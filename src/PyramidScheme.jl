@@ -13,7 +13,7 @@ using DiskArrays: DiskArrays
 #using YAXArrays: savecube
 using YAXArrayBase: YAXArrayBase as YAB
 using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
-using Zarr: zcreate, writeattrs
+using Zarr: Zarr, zcreate, zopen, writeattrs
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent
