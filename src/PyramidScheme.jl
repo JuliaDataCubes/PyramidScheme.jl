@@ -50,9 +50,9 @@ end
 Pyramid(path::AbstractString) = Pyramid(path, YAB.backendfrompath(path)(path))
 function Pyramid(path::AbstractString, backend)
     #This should rather be solved via dispatch, but this is not working because of Requires in YAXArrayBase.
-    if backend isa YAB.ZarrDataset
+    if backend isa YAB.backendlist[:zarr]
         _pyramid_zarr(path)
-    elseif backend isa YAB.GDALDataset
+    elseif backend isa YAB.backendlist[:gdal]
         _pyramid_gdal(path)
     else
         throw(ArgumentError("""
@@ -61,7 +61,6 @@ function Pyramid(path::AbstractString, backend)
         """))
     end
 end
-
 function _pyramid_gdal end
 
 function _pyramid_zarr(path)
@@ -95,6 +94,15 @@ DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
 DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
 DD.dims(pyramid::Pyramid) = DD.dims(parent(pyramid))
 DD.metadata(pyramid::Pyramid) = pyramid.metadata
+
+function DD.modify(f, pyr::Pyramid)
+    pbase = DD.modify(f, pyr.base)
+    plevels = map(pyr.levels) do level
+        DD.modify(f, level)
+    end
+    Pyramid(pbase, plevels, pyr.metadata)
+end
+Base.read(pyr::Pyramid) = DD.modify(Array, pyr)
 @inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
     Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels, A.metadata)
 end
@@ -309,7 +317,8 @@ The data is aggregated with the specified `resampling_method`.
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
 function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
-    if YAB.backendfrompath(path) != YAB.ZarrDataset 
+    if YAB.backendfrompath(path) != YAB.backendlist[:zarr]
+        @show YAB.backendfrompath(path)
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
 
@@ -464,8 +473,5 @@ function tms_json(pyramid)
     push!(tms, "orderedAxes" => pyramidaxes())
     return tms
 end
-
 include("broadcast.jl")
-
-
 end

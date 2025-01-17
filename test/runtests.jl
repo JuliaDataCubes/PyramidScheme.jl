@@ -65,14 +65,16 @@ end
 @testitem "ArchGDAL Loading of Geotiff Overviews" begin
     using ArchGDAL: ArchGDAL as AG
     using PyramidScheme: PyramidScheme as PS
-    @show pwd()
-    @show @__DIR__
-    path = joinpath(@__DIR__,"data/pyramidmiddle.tif")
+    using Rasters
+    data = rand(2000,2000)
+    r = Raster(data, (X(1:2000), Y(1:2000)))
+    tname = tempname() * ".tif"
+    write(tname, r, driver="cog", force=true)
+    ptif = Pyramid(tname)
     #ras = Raster(path, lazy=true)
-    pyr =PS.Pyramid(path)
-    @test pyr isa PS.Pyramid
-    @test PS.nlevels(pyr) == 2
-    sub = pyr[1:10,1:10]
+    @test ptif isa PS.Pyramid
+    @test PS.nlevels(ptif) == 2
+    sub = ptif[1:10,1:10]
     @test sub isa PS.Pyramid
 end
 
