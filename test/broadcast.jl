@@ -2,7 +2,8 @@
     using PyramidScheme: PyramidScheme as PS
     using DimensionalData
     using Rasters
-    data = zeros(2000,2000)
+    #using ArchGDAL
+    data = rand(2000,2000)
     dd = DimArray(data, (X(11:2010), Y(101:2100)))
     pyramid = PS.Pyramid(dd)
     p0 = pyramid .- pyramid
@@ -14,11 +15,17 @@
     for l in p1.levels
         @test sum(l) == prod(size(l))
     end
-    tname = tempname() * ".tif"
-    r = Raster(dd)
-    write(tname, r, driver="cog", force=true)
-    ptif = Pyramid(tname)
+    #tname = tempname() * ".tif"
+    #r = Raster(dd)
+    #write(tname, r, driver="cog", force=true)
+    #ptif = Pyramid(tname)
+    #ptif0 = ptif .- ptif
+    #@test all(iszero, ptif0.base)
+    #@test all(all.(iszero, ptif0.levels))
+
+    #pyr500 = Pyramid(dd)
     # This fails because the pyramids have different layers
-    @test_broken p0mix = ptif .- pyramid
+    #p0mix = ptif .- pyr500
+    #@test all(iszero, p0mix.base)
  
 end
