@@ -322,7 +322,8 @@ The data is aggregated with the specified `resampling_method`.
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
 function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
-    if !isa(YAB.backendfrompath(path),YAB.backendlist[:zarr])
+    if YAB.backendfrompath(path) != YAB.backendlist[:zarr]
+        @show YAB.backendfrompath(path)
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
 
