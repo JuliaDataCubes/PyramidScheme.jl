@@ -77,7 +77,6 @@ end
     sub = ptif[1:10,1:10]
     @test sub isa PS.Pyramid
 end
-=#
 
 @testitem "Zarr build Pyramid inplace" begin
     using Zarr
