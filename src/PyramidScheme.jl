@@ -326,7 +326,10 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     # Build a loop for all variables in a dataset?
     org = Cube(path)
     # We run the method once to derive the output type
-    t = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    #tfunc = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
+    t = Base.infer_return_type(resampling_method, (Matrix{eltype(ras)},))
+
     n_level = compute_nlevels(org)            
     input_axes = filter(x-> x isa SpatialDim,  DD.dims(org))
     if length(input_axes) != 2
@@ -386,7 +389,8 @@ function getpyramids(reducefunc, ras;recursive=true)
     end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-    outtype = typeof(reducefunc(rand(eltype(ras),2,2)))
+    outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
+    #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
     outmin = output_arrays(pyramid_sizes, outtype)
     fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
 
