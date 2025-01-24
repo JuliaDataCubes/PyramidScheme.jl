@@ -19,6 +19,7 @@ using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent
 using FillArrays: Zeros
 using Proj
+import DiskArrays: cache
 using OffsetArrays
 
 using Statistics: mean
@@ -63,7 +64,7 @@ function Pyramid(path::AbstractString, backend)
 end
 function _pyramid_gdal end
 
-function _pyramid_zarr(path)
+function _load_pyramid(path, backend)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
     base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
@@ -291,6 +292,11 @@ function gen_output(t,s; path=tempname())
         zeros(t,s...)
     end
 end
+
+function cache(p::Pyramid; maxsize=1000)
+    maxsize = maxsize ÷ (length(p.levels) + 1)
+    Pyramid(cache(p.base; maxsize), cache.(p.levels; maxsize), p.metadata)
+end
 function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray) 
     dataengine = engine(dimarr.data)
     DD.rebuild(dimarr, data=dataengine)
@@ -474,4 +480,8 @@ function tms_json(pyramid)
     return tms
 end
 include("broadcast.jl")
+include("pyramidprovider.jl")
+include("tilepyramids.jl")
+
+
 end
