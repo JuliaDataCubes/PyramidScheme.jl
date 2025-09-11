@@ -50,7 +50,7 @@ Statistics = "1.10"
 Test = "1.10"
 TestItemRunner = "0.2.3"
 YAXArrayBase = "0.6.1, 0.7"
-YAXArrays = "0.5.6"
+YAXArrays = "0.5.6, 0.6, 0.7"
 Zarr = "0.9.3"
 julia = "1.9"
 
