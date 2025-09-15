@@ -88,8 +88,9 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
 end
 
 function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
-    ext = extent(p.arg1[], (XDim, YDim)) 
-    return Rect2f((ext.X[1], ext.Y[1]), (ext.X[2] - ext.X[1], ext.Y[2] - ext.Y[1]))
+    extX, extY = extent(p.arg1[], (XDim, YDim))
+    rect = Rect3f((extX[1], extY[1],0), (extX[2] - extX[1], extY[2] - extY[1], 0))
+    return rect
 end
 Makie.boundingbox(p::Heatmap{<: Tuple{<: Pyramid}}, space::Symbol = :data) = Makie.apply_transform_and_model(p, Makie.data_limits(p))
 
