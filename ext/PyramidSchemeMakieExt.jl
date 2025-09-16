@@ -64,7 +64,8 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         output_name = :__pyramid_pixelspace_positions,
     )
 
-    map!(plot, [:arg1, :__pyramid_dataspace_positions, :__pyramid_pixelspace_positions], :pyramid_sampled_data) do pyramid, datapos, pixelpos
+    data = Observable{DD.AbstractDimMatrix}(levels(plot.arg1[])[end-2][:, :])
+    onany(plot, plot.arg1, plot.__pyramid_dataspace_positions, plot.__pyramid_pixelspace_positions) do pyramid, datapos, pixelpos
         xyext = values.(extent(pyramid, (XDim, YDim)))
         xval, yval = first(xyext), last(xyext)
         pyramid_data_ext = Extent(X=xval, Y=yval)
@@ -76,15 +77,14 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
 
         if intersects(pyramid_data_ext, data_limits_ext)
-            return Ref{DD.AbstractDimMatrix}(miss2nan.(
+            data[] = miss2nan.(
                 selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
-            ))
-        else
-            return Ref{DD.AbstractDimMatrix}(zeros(X(1), Y(1)))
+            )
         end
+        nothing
     end
 
-    heatmap!(plot, plot.attributes, plot.pyramid_sampled_data)
+    heatmap!(plot, plot.attributes, data)
 end
 
 function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
