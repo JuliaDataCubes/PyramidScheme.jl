@@ -10,7 +10,7 @@ using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
 miss2nan(x) = ismissing(x) ? NaN : x
 
-# hacks to get around DD hacks
+# hacks to get around DD hacks that get around Makie issues
 for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface) 
     f = Makie.plotkey(p)
     @eval begin
@@ -18,7 +18,7 @@ for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface)
             invoke(Makie.$f, Tuple{AbstractMatrix{<: Any}}, A; kwargs...)
         end
         function Makie.$f(A::Observable{<: Pyramid}; kwargs...)
-            invoke(Makie.$f, Tuple{AbstractMatrix{<: Any}}, A; kwargs...)
+            invoke(Makie.$f, Tuple{<:Union{<:AbstractMatrix{<: Any}, <:Observable{<: AbstractMatrix{<:Any}}}}, A; kwargs...)
         end
         Makie.expand_dimensions(::Type{$p}, p::Pyramid) = (p,)
         Makie.convert_arguments(::Type{$p}, p::Pyramid) = (p,)
