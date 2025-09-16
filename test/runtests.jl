@@ -42,6 +42,9 @@ end
     @test size(subpyramid) == (10,10)
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
+    @test length(axis.scene.plots) == 1
+    plot!(axis, pyramid)
+    @test length(axis.scene.plots) == 2
 end
 
 @testitem "Pyramid building RGB eltype" begin
@@ -136,6 +139,8 @@ end
         @test PS.levels(pyrcat2, l) == cat(PS.levels(pyr1, l), PS.levels(pyr2, l), dims=X)
     end
 end
+
+
 
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
