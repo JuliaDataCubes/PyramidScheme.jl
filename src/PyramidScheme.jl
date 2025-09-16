@@ -275,7 +275,6 @@ function agg_axis(d,n)
     # TODO this is only correct for points not intervals
     npoints = cld(length(d), n)
     half_stepsize = step(d) * (n-1) / 2 
-    @show half_stepsize
     sgn = DD.isreverse(d) ? -1 : 1
     DD.set(d, LinRange(first(d) + sgn * half_stepsize, last(d) - sgn * half_stepsize, npoints))
 end
