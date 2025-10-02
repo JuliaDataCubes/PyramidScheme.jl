@@ -16,7 +16,7 @@ using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_datase
 using Zarr: Zarr, zcreate, zopen, writeattrs
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
-using Extents: Extent, extent
+using Extents: Extent, extent, intersects
 using FillArrays: Zeros
 using Proj
 using OffsetArrays
@@ -39,7 +39,7 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
     metadata::Me
 end
 
-function Pyramid(data::DD.AbstractDimArray; resampling_method=mean ∘ skipmissing, kwargs...)
+function Pyramid(data::DD.AbstractDimArray; resampling_method= mean ∘ skipmissing, kwargs...)
     pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
     levels = DD.DimArray.(pyrdata, pyraxs)
     meta = Dict(deepcopy(DD.metadata(data)))
@@ -103,7 +103,7 @@ function DD.modify(f, pyr::Pyramid)
     Pyramid(pbase, plevels, pyr.metadata)
 end
 Base.read(pyr::Pyramid) = DD.modify(Array, pyr)
-@inline function DD.rebuild(A::Pyramid, data, dims::Tuple=dims(A), refdims=refdims(A), name=name(A))
+@inline function DD.rebuild(A::Pyramid, data, dims::Tuple=DD.dims(A), refdims=DD.refdims(A), name=DD.name(A))
     Pyramid(DD.rebuild(parent(A), data, dims, refdims, name, nothing), A.levels, A.metadata)
 end
 
@@ -271,9 +271,19 @@ Compute the number of levels for the aggregation based on the size of `data`.
 compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
 
 function agg_axis(d,n)
-    # TODO this might be problematic for explicitly set axes
-    DD.set(d, LinRange(first(d), last(d), cld(length(d), n)))
+    # TODO this might be problematic for Reversed axes
+    # TODO this is only correct for points not intervals
+    npoints = cld(length(d), n)
+    half_stepsize = step(d) * (n-1) / 2 
+    sgn = DD.isreverse(d) ? -1 : 1
+    DD.set(d, LinRange(first(d) + sgn * half_stepsize, last(d) - sgn * half_stepsize, npoints))
 end
+#=
+.   .
+  .    <--- new point
+.   .
+=#
+
 """
     gen_output(t,s)
 
@@ -326,7 +336,11 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     # Build a loop for all variables in a dataset?
     org = Cube(path)
     # We run the method once to derive the output type
-    t = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    #tfunc = typeof(resampling_method(zeros(eltype(org), 2,2)))
+    #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
+
+    t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(org))},))
+
     n_level = compute_nlevels(org)            
     input_axes = filter(x-> x isa SpatialDim,  DD.dims(org))
     if length(input_axes) != 2
@@ -377,16 +391,17 @@ end
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
     input_axes = DD.dims(ras)
-    n_level = compute_nlevels(ras)            
+    n_level = compute_nlevels(ras, tilesize)
     if iszero(n_level)
-        @info "Array is smaller than the tilesize no pyramids are computed"
-        [ras], [dims(ras)]
+        @info "Array is smaller than the tilesize no pyramidlevels are computed"
+        [ras], [DD.dims(ras)]
     end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-    outtype = typeof(reducefunc(rand(eltype(ras),2,2)))
+    outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
+    #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
     outmin = output_arrays(pyramid_sizes, outtype)
     fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
 
@@ -402,6 +417,7 @@ Internal function to select the raster data that should be plotted on screen.
 """
 function selectlevel(pyramid, ext;target_imsize=(1024, 512))
     pyrext = extent(pyramid)
+    intersects(pyrext, ext) || return zero(pyramid.levels[end])
     basepixels = map(keys(pyrext)) do bb
         pyrspan = pyrext[bb][2] - pyrext[bb][1]
         imsize = ext[bb][2] - ext[bb][1]
@@ -473,5 +489,15 @@ function tms_json(pyramid)
     push!(tms, "orderedAxes" => pyramidaxes())
     return tms
 end
+function Base.cat(A1::Pyramid, As::Pyramid...;dims)
+    println("Inside pyr cat")
+    @show typeof(levels.(As, 1))
+    catlevels = [cat(A1.levels[i], levels.(As, i)...; dims) for i in eachindex(A1.levels)]
+    catbase = cat(parent(A1), parent.(As)...; dims)
+    Pyramid(catbase, catlevels, merge(DD.metadata(A1), DD.metadata.(As)...))
+end
+
+
+
 include("broadcast.jl")
 end

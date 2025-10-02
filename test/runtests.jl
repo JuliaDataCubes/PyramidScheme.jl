@@ -42,6 +42,9 @@ end
     @test size(subpyramid) == (10,10)
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
+    @test length(axis.scene.plots) == 1
+    plot!(axis, pyramid)
+    @test length(axis.scene.plots) == 2
 end
 
 @testitem "Pyramid building RGB eltype" begin
@@ -120,6 +123,23 @@ end
     @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
 
 end
+
+
+@testitem "cat Pyramids" begin
+    using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
+    pyr1 = Pyramid(rand(X(1:128),Y(1:128)), tilesize=16)
+    pyrcat = cat(pyr1, pyr1, dims=Dim{:new}([1,2]))
+    pyrcat3 = cat(pyr1, pyr1, pyr1, dims=Dim{:new}([1,2,3]))
+    pyr2 = Pyramid(rand(X(129:256), Y(1:128)), tilesize=16)
+    pyrcat2 = cat(pyr1, pyr2, dims=X)
+    for l in 1:3
+        @test PS.levels(pyrcat,l) == cat(PS.levels(pyr1, l), PS.levels(pyr1, l), dims=Dim{:new}([1,2]))
+        @test PS.levels(pyrcat3, l) == cat(PS.levels(pyr1, l), PS.levels(pyr1, l), PS.levels(pyr1, l), dims=Dim{:new}([1,2,3]))
+        @test PS.levels(pyrcat2, l) == cat(PS.levels(pyr1, l), PS.levels(pyr2, l), dims=X)
+    end
+end
+
 
 
 #=
