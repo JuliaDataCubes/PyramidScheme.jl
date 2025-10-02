@@ -100,6 +100,20 @@ end
     #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 end
 
+@testitem "getindex lazy" begin
+        using Zarr
+    using PyramidScheme
+    using YAXArrays
+    using Statistics
+    using DimensionalData
+    using DiskArrays.TestTypes
+    a = rand(1200,1200)
+    acount = AccessCountDiskArray(a)
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), acount)
+    pyr = Pyramid(yax)
+    pyrcount = Pyramid(yax, [YAXArray(dims(yaxi), AccessCountDiskArray(yaxi.data)) for yaxi in pyr.levels], pyr.metadata)
+end
+
 @testitem "selectlevel" begin
     using PyramidScheme: PyramidScheme as PS
     using YAXArrays
@@ -121,7 +135,6 @@ end
     target_imsize=(400, 300)
     sub =  PS.selectlevel(pyramid, extent(pyramid); target_imsize)
     @test any( (target_imsize ./ 2) .<= size(sub) .<= target_imsize)
-
 end
 
 
