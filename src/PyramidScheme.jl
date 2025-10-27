@@ -64,7 +64,7 @@ function Pyramid(path::AbstractString, backend)
 end
 function _pyramid_gdal end
 
-function _load_pyramid(path, backend)
+function _pyramid_zarr(path)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
     base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
@@ -423,8 +423,8 @@ end
 
 
 
-xkey(keyext) = DD.dim2key(DD.dims(keyext, XDim))
-ykey(keyext) = DD.dim2key(DD.dims(keyext, YDim))
+xkey(keyext) = DD.name(DD.dims(keyext, XDim))
+ykey(keyext) = DD.name(DD.dims(keyext, YDim))
 #TODO write test, move to utils.jl
 
 """

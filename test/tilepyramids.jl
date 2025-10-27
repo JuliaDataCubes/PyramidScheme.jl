@@ -23,5 +23,6 @@ s = HTTP.serve!(pv,"127.0.0.1",8766)
 
 datarange = (-15. , 15.)
 diffprov = PS.PyramidProvider(PS.cache(agbdiff), datarange..., colorscheme=:diverging_gkr_60_10_c40_n256)
-sd = HTTP.serve!(diffprov,"127.0.0.1",8767)
-prov = TileProviders.Provider("http://127.0.0.1:8765/{z}/{x}/{y}.png")
+portnumber = rand(8700:8800)
+sd = HTTP.serve!(diffprov,"127.0.0.1",portnumber)
+prov = TileProviders.Provider("http://127.0.0.1:$portnumber/{z}/{x}/{y}.png")

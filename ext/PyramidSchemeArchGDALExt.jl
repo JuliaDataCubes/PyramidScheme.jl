@@ -3,10 +3,10 @@ using ArchGDAL: ArchGDAL as AG
 using PyramidScheme: PyramidScheme as PS
 import PyramidScheme: _pyramid_gdal
 using YAXArrays
-using YAXArrayBase: GDALDataset
 using DimensionalData
 
-function _load_pyramid(path::AbstractString, GDALDataset)
+
+function _pyramid_gdal(path::AbstractString)
     base = Cube(path)
     agbase = AG.readraster(path)
     band = AG.getband(agbase,1)

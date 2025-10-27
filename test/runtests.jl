@@ -146,7 +146,8 @@ end
     pyramid = Pyramid(yax)
     data_min, data_max = extrema(a)
     pyrprov = PyramidScheme.PyramidProvider(pyramid, data_min, data_max)
-    HTTP.serve(pyrprov, port=8080)    
+    port = rand(8700:8800)
+    HTTP.serve(pyrprov; port)    
 end
 
 
