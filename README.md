@@ -1,4 +1,6 @@
 # PyramidScheme
+[![codecov](https://codecov.io/gh/JuliaDataCubes/PyramidScheme.jl/graph/badge.svg?token=EBhwEBXlnx)](https://codecov.io/gh/JuliaDataCubes/PyramidScheme.jl)
+
 
 PyramidScheme.jl is a package to easily and efficiently compute pyramids of a given datacube which might be larger than RAM.
 It uses DiskArrayEngine.jl as the computational backend.
