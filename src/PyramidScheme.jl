@@ -433,8 +433,8 @@ end
 
 
 
-xkey(keyext) = DD.dim2key(DD.dims(keyext, XDim))
-ykey(keyext) = DD.dim2key(DD.dims(keyext, YDim))
+xkey(keyext) = DD.name(DD.dims(keyext, XDim))
+ykey(keyext) = DD.name(DD.dims(keyext, YDim))
 #TODO write test, move to utils.jl
 
 """
