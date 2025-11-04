@@ -137,6 +137,28 @@ end
     end
 end
 
+@testitem "Building pyramid with additional dimension" begin
+    # The aim of this test is to check whether we can build a pyramid from a data cube with an extra dimension.
+    # We will only build the pyramids on the spatial dimensions and keep the other dimensions as is.
+    using YAXArrays
+    using Zarr
+    using PyramidScheme
+    using DimensionalData
+    s = (2048, 1024,3)
+    a = ones(s)
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2)), Z(1:3)), a)
+    path = tempname() *".zarr"
+    savecube(yax, path)
+    pyr = buildpyramids(path, resampling_method=sum)
+    pyrdisk = Pyramid(path)
+    for p in [pyr, pyrdisk]
+        @test p isa Pyramid
+        @test length(dims(p)) == 3
+        @test size(p.levels[end]) == (256,128,3)
+        @test p.levels[1][1,1,1] == 4
+    end
+
+end
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
