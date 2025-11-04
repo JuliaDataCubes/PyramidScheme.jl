@@ -124,10 +124,10 @@ end
     Pyramid(newbase, newlevels, DD.metadata(A))
 end
 
-function Base.map(f, A::Pyramid)
-    newbase = map(f, parent(A))
-    newlevels = [map(f, levels(A,i)) for i in 1:nlevels(A)]
-    Pyramid(newbase, newlevels, DD.metadata(A)) # This should handle metadata better.
+function Base.map(f, A1::Pyramid, As::Pyramid...)
+    newbase = map(f, parent(A1), parent.(As)...)
+    newlevels = [map(f, levels(A1,i), levels.(As, i)...) for i in 1:nlevels(A1)]
+    Pyramid(newbase, newlevels, DD.metadata(A1)) # This should handle metadata better.
 end
 
 function DD.show_after(io::IO, mime, A::Pyramid)
