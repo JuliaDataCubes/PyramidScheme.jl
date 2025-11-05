@@ -42,6 +42,9 @@ end
     @test size(subpyramid) == (10,10)
     @test parent(subpyramid) == data[1:10,1:10]
     fig, axis, h = plot(pyramid)
+    @test length(axis.scene.plots) == 1
+    plot!(axis, pyramid)
+    @test length(axis.scene.plots) == 2
 end
 
 #= building an RGB pyramid doesn't work, need to think more about it.
@@ -161,6 +164,23 @@ end
     end
 
 end
+@testitem "Map of pyramids" begin
+    using DimensionalData
+    pyr1 = Pyramid(fill(1,X(1:128),Y(1:128)), tilesize=16)
+    pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
+    pyr1_neg = map(x-> x-1, pyr1)
+    @test all(all.(iszero, pyr1_neg.levels))
+    @test iszero(pyr1_neg.base)
+    pyr2_neg = map(x-> x-1, pyr2)
+    @test pyr2_neg.levels[1][1,1] == 3
+
+    pyrsum = map((x,y) -> x + y, pyr1, pyr2)
+    @test pyrsum[100,30] == 2
+    @test pyrsum.levels[1][10,10] == 5
+    @test pyrsum.levels[2][10,10] == 17
+end
+
+
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
