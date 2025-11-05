@@ -353,14 +353,14 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
 
     t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(org))},))
-
     n_level = compute_nlevels(org)            
     input_axes = DD.dims(org, spatial_dims)
+    outarrs = [output_zarr(n, DD.dims(org), t, joinpath(path, string(n)),input_axes) for n in 1:n_level]
+
     if length(input_axes) != 2
         throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
     end
     verbose && println("Constructing output arrays")
-    outarrs = [output_zarr(n, DD.dims(org), t, joinpath(path, string(n)),input_axes) for n in 1:n_level]
     verbose && println("Start computation")
     ispatial_dims = DD.dimnum(DD.dims(org),spatial_dims)
     fill_pyramids(org, outarrs, resampling_method, recursive, ispatial_dims;runner)
@@ -385,6 +385,7 @@ end
 
 """
     output_zarr(n, input_axes, t, path)
+
 Construct a Zarr dataset for the level n of a pyramid for the dimensions `input_axes`.
 It sets the type to `t` and saves it to `path/n`
 """
@@ -413,7 +414,7 @@ end
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256, spatial_dims=SpatialDim)
     input_axes = DD.dims(ras)
     n_level = compute_nlevels(ras, tilesize)
     if iszero(n_level)
@@ -425,7 +426,9 @@ function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
     outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
     #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
     outmin = output_arrays(pyramid_sizes, outtype)
-    fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
+    ispatial_dims = DD.dimnum(DD.dims(ras),spatial_dims)
+
+    fill_pyramids(ras,outmin,reducefunc,recursive, ispatial_dims; threaded=true)
 
     outmin, pyramid_axes
 end
