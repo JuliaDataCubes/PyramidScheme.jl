@@ -141,6 +141,7 @@ end
 end
 
 @testitem "Map of pyramids" begin
+    using DimensionalData
     pyr1 = Pyramid(fill(1,X(1:128),Y(1:128)), tilesize=16)
     pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
     pyr1_neg = map(x-> x-1, pyr1)
@@ -148,7 +149,7 @@ end
     @test iszero(pyr1_neg.base)
     pyr2_neg = map(x-> x-1, pyr2)
     @test pyr2_neg.levels[1][1,1] == 3
-    
+
     pyrsum = map((x,y) -> x + y, pyr1, pyr2)
     @test pyrsum[100,30] == 2
     @test pyrsum.levels[1][10,10] == 5
