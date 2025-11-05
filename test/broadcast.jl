@@ -15,6 +15,10 @@
     for l in p1.levels
         @test sum(l) == prod(size(l))
     end
+
+    @test_throws ArgumentError pyramid .- pyramid.base
+    @test_throws ArgumentError pyramid .- pyramid.base.data
+
     #tname = tempname() * ".tif"
     #r = Raster(dd)
     #write(tname, r, driver="cog", force=true)
