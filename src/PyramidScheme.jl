@@ -209,17 +209,30 @@ Fill the pyramids generated from the `data` with the aggregation function `func`
 `recursive` indicates whether higher tiles are computed from lower tiles or directly from the original data. 
 This is an optimization which for functions like median might lead to misleading results.
 """
-function fill_pyramids(data, outputs,func,recursive;runner=LocalRunner, kwargs...)
+function fill_pyramids(data, outputs,func,recursive,spatial_dims;runner=LocalRunner, kwargs...)
     n_level = length(outputs)
     pixel_base_size = 2^n_level
     pyramid_sizes = size.(outputs)
     tmp_sizes = [ceil(Int,pixel_base_size / 2^i) for i in 1:n_level]
 
-    ia  = InputArray(data, windows = arraywindows(size(data),pixel_base_size))
+    inputwindows = Base.OneTo.(size(data))
+    outputwindows = Base.OneTo.(size(data))
+    for d in spatial_dims
+        inputwindows = Base.setindex(inputwindows,RegularWindows(1,size(data,d),window=pixel_base_size),d)
+    end
 
-    oa = ntuple(i->create_outwindows(pyramid_sizes[i],windows = arraywindows(pyramid_sizes[i],tmp_sizes[i])),n_level)
+    ia  = InputArray(data, windows = inputwindows)
+
+
+    oa = ntuple(n_level) do i
+        for d in spatial_dims
+            outputwindows = Base.setindex(outputwindows,RegularWindows(1,pyramid_sizes[i][d],window=tmp_sizes[i]),d)
+        end
+        create_outwindows(pyramid_sizes[i],windows = outputwindows)
+    end
 
     func = DiskArrayEngine.create_userfunction(gen_pyr,ntuple(_->eltype(first(outputs)),length(outputs));is_mutating=true,kwargs = (;recursive),args = (func,))
+
 
     op = GMDWop((ia,), oa, func)
 
@@ -317,7 +330,7 @@ output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
     SpatialDim
 Union of Dimensions which are assumed to be in space and are therefore used in the pyramid building. 
 """
-SpatialDim = Union{DD.Dimensions.XDim, DD.Dimensions.YDim}
+SpatialDim = (DD.Dimensions.XDim, DD.Dimensions.YDim)
 
 """
     buildpyramids(path; resampling_method=mean)
@@ -326,7 +339,7 @@ The different scales are written according to the GeoZarr spec and a multiscales
 The data is aggregated with the specified `resampling_method`. 
 Keyword arguments are forwarded to the `fill_pyramids` function.
 """
-function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false)
+function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false, spatial_dims=SpatialDim)
     if YAB.backendfrompath(path) != YAB.backendlist[:zarr]
         @show YAB.backendfrompath(path)
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
@@ -340,17 +353,19 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
 
     t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(org))},))
-
     n_level = compute_nlevels(org)            
-    input_axes = filter(x-> x isa SpatialDim,  DD.dims(org))
+    input_axes = DD.dims(org, spatial_dims)
+    outarrs = [output_zarr(n, DD.dims(org), t, joinpath(path, string(n)),input_axes) for n in 1:n_level]
+
     if length(input_axes) != 2
         throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
     end
     verbose && println("Constructing output arrays")
-    outarrs = [output_zarr(n, input_axes, t, joinpath(path, string(n))) for n in 1:n_level]
     verbose && println("Start computation")
-    fill_pyramids(org, outarrs, resampling_method, recursive;runner)
-    pyraxs = [agg_axis.(input_axes, 2^n) for n in 1:n_level]
+    ispatial_dims = DD.dimnum(DD.dims(org),spatial_dims)
+    fill_pyramids(org, outarrs, resampling_method, recursive, ispatial_dims;runner)
+    pyraxs_space = [agg_axis.(input_axes, 2^n) for n in 1:n_level]
+    pyraxs = [DD.setdims(DD.dims(org),p) for p in pyraxs_space]
     pyrlevels = DD.DimArray.(outarrs, pyraxs)
     meta = Dict(deepcopy(DD.metadata(org)))
     push!(meta, "resampling_method" => string(resampling_method))
@@ -370,15 +385,23 @@ end
 
 """
     output_zarr(n, input_axes, t, path)
+
 Construct a Zarr dataset for the level n of a pyramid for the dimensions `input_axes`.
 It sets the type to `t` and saves it to `path/n`
 """
-function output_zarr(n, input_axes, t, path)
-    aggdims = agg_axis.(input_axes, 2^n)
-    s = length.(aggdims)
+function output_zarr(n, input_axes, t, path, spatialdims;chunksizes=nothing)
+    spatial_axes = DD.dims(input_axes,spatialdims)
+    aggdims = agg_axis.(spatial_axes, 2^n)
+    spatial_axes_new = DD.setdims(input_axes,aggdims)
+    s = length.(spatial_axes_new)
     z = Zeros(t, s...)
-    yax = YAXArray(aggdims, z)
-    chunked = setchunks(yax , (1024, 1024))
+    yax = YAXArray(spatial_axes_new, z)
+    if chunksizes === nothing
+        dchunksizes = map(d->DD.rebuild(d,1),input_axes)
+        dchunksizes = DD.setdims(dchunksizes,map(d->DD.rebuild(d,1024),spatial_axes))
+        chunksizes = map(i->i.val,dchunksizes)
+    end
+    chunked = setchunks(yax , chunksizes)
     # This assumes that there is only the spatial dimensions to save
     ds = to_dataset(chunked, )
     dssaved = savedataset(ds; path, skeleton=true, driver=:zarr)
@@ -391,7 +414,7 @@ end
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256, spatial_dims=SpatialDim)
     input_axes = DD.dims(ras)
     n_level = compute_nlevels(ras, tilesize)
     if iszero(n_level)
@@ -403,7 +426,9 @@ function getpyramids(reducefunc, ras;recursive=true, tilesize=256)
     outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
     #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
     outmin = output_arrays(pyramid_sizes, outtype)
-    fill_pyramids(ras,outmin,reducefunc,recursive; threaded=true)
+    ispatial_dims = DD.dimnum(DD.dims(ras),spatial_dims)
+
+    fill_pyramids(ras,outmin,reducefunc,recursive, ispatial_dims; threaded=true)
 
     outmin, pyramid_axes
 end
