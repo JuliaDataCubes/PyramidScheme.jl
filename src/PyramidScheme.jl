@@ -39,8 +39,8 @@ struct Pyramid{T,N,D,A,B<:DD.AbstractDimArray{T,N,D,A},L, Me} <: DD.AbstractDimA
     metadata::Me
 end
 
-function Pyramid(data::DD.AbstractDimArray; resampling_method= mean ∘ skipmissing, kwargs...)
-    pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
+function Pyramid(data::DD.AbstractDimArray; resampling_method= mean ∘ skipmissing, eltype=nothing, kwargs...)
+    pyrdata, pyraxs = getpyramids(resampling_method, data; eltype, kwargs...)
     levels = DD.DimArray.(pyrdata, pyraxs)
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
@@ -352,7 +352,8 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     #tfunc = typeof(resampling_method(zeros(eltype(org), 2,2)))
     #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
 
-    t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(org))},))
+    t = Base.infer_return_type(resampling_method, (Matrix{eltype(org)},))
+
     n_level = compute_nlevels(org)            
     input_axes = DD.dims(org, spatial_dims)
     outarrs = [output_zarr(n, DD.dims(org), t, joinpath(path, string(n)),input_axes) for n in 1:n_level]
@@ -414,7 +415,7 @@ end
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimension values of the aggregated axes.
 """
-function getpyramids(reducefunc, ras;recursive=true, tilesize=256, spatial_dims=SpatialDim)
+function getpyramids(reducefunc, ras;recursive=true, tilesize=256, spatial_dims=SpatialDim, eltype=nothing)
     input_axes = DD.dims(ras)
     n_level = compute_nlevels(ras, tilesize)
     if iszero(n_level)
@@ -423,7 +424,11 @@ function getpyramids(reducefunc, ras;recursive=true, tilesize=256, spatial_dims=
     end 
     pyramid_sizes =  [ceil.(Int, size(ras) ./ 2^i) for i in 1:n_level]
     pyramid_axes = [agg_axis.(input_axes,2^i) for i in 1:n_level]
-    outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
+    if isnothing(eltype)
+        outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
+    else
+        outtype = eltype
+    end
     #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
     outmin = output_arrays(pyramid_sizes, outtype)
     ispatial_dims = DD.dimnum(DD.dims(ras),spatial_dims)

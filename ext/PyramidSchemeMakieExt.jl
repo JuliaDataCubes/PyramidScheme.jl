@@ -8,7 +8,7 @@ using PyramidScheme: Pyramid, switchkeys, levels, selectlevel, xkey, ykey
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
-miss2nan(x) = ismissing(x) ? NaN : x
+miss2nan(T::Type) = x -> ismissing(x) ? T(NaN) : x
 
 # hacks to get around DD hacks that get around Makie issues
 for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface) 
@@ -77,8 +77,8 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
 
         if intersects(pyramid_data_ext, data_limits_ext)
-            data[] = miss2nan.(
-                selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
+            data[] = miss2nan(nonmissingtype(eltype(data[]))).(
+                selectlevel(pyramid, datalimit, target_imsize = pixel_widths),
             )
         end
         nothing
