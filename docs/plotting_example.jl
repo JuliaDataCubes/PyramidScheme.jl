@@ -6,8 +6,10 @@ using YAXArrays
 data = rand(20000, 20000)
 dd = DimArray(data, (X(1:size(data, 1)), Y(1:size(data, 2))))
 dd = YAXArray((X(1:size(data, 1)), Y(1:size(data, 2))), data)
-sc = savecube(dd, "test/data/test.zarr")
-pyramid = PS.Pyramid(dd)
+savecube(dd, "test/data/test.zarr")
+PS.buildpyramids("test/data/test.zarr")
+pyramid = PS.Pyramid("test/data/test.zarr")
+# pyramid = PS.Pyramid(dd)
 
 fig = Figure()
 sli = Slider(fig[2, 1], range = LinRange(extrema(data)..., 100), startvalue = (maximum(data) + minimum(data))/2, tellwidth = false, tellheight = true)
