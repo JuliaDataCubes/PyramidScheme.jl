@@ -13,13 +13,25 @@ miss2nan(x) = ismissing(x) ? NaN : x
 # hacks to get around DD hacks that get around Makie issues
 for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface) 
     f = Makie.plotkey(p)
+    fbang = Symbol(f, :!)
     @eval begin
         function Makie.$f(A::Pyramid; kwargs...)
             invoke(Makie.$f, Tuple{AbstractMatrix{<: Any}}, A; kwargs...)
         end
         function Makie.$f(A::Observable{<: Pyramid}; kwargs...)
-            invoke(Makie.$f, Tuple{<:Union{<:AbstractMatrix{<: Any}, <:Observable{<: AbstractMatrix{<:Any}}}}, A; kwargs...)
+            invoke(Makie.$f, Tuple{<:Observable{<: AbstractMatrix{<:Any}}}, A; kwargs...)
         end
+        function Makie.$f(gp::Makie.GridPosition, A::Observable{<: Pyramid}; kwargs...)
+            invoke(Makie.$f, Tuple{typeof(gp), <:Observable{<: AbstractMatrix{<:Any}}}, gp, A; kwargs...)
+        end
+
+        function Makie.$fbang(ax::Makie.AbstractAxis, A::Pyramid; kwargs...)
+            invoke(Makie.$fbang, Tuple{typeof(ax), AbstractMatrix{<: Any}}, ax, A; kwargs...)
+        end
+        function Makie.$fbang(ax::Makie.AbstractAxis, A::Observable{<: Pyramid}; kwargs...)
+            invoke(Makie.$fbang, Tuple{typeof(ax), <:Observable{<: AbstractMatrix{<:Any}}}, ax, A; kwargs...)
+        end
+
         Makie.expand_dimensions(::Type{$p}, p::Pyramid) = (p,)
         Makie.convert_arguments(::Type{$p}, p::Pyramid) = (p,)
     end
@@ -37,8 +49,6 @@ end
 
 Makie.expand_dimensions(::PyramidConversion, p::Pyramid) = (p,)
 Makie.convert_arguments(::PyramidConversion, p::Pyramid) = (p,)
-
-
 
 Makie.plottype(::Pyramid) = Makie.Heatmap
 
@@ -64,8 +74,8 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         output_name = :__pyramid_pixelspace_positions,
     )
 
-    data = Observable{DD.AbstractDimMatrix}(levels(plot.arg1[])[end-2][:, :])
-    onany(plot, plot.arg1, plot.__pyramid_dataspace_positions, plot.__pyramid_pixelspace_positions) do pyramid, datapos, pixelpos
+    Makie.register_computation!(plot, [:arg1, :__pyramid_dataspace_positions, :__pyramid_pixelspace_positions], [:__pyramid_data]) do inputs, changed, cached
+        pyramid, datapos, pixelpos = inputs
         xyext = values.(extent(pyramid, (XDim, YDim)))
         xval, yval = first(xyext), last(xyext)
         pyramid_data_ext = Extent(X=xval, Y=yval)
@@ -75,16 +85,17 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         pixel_widths = Point2f(abs.(pixelpos[2] .- pixelpos[1]))
 
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
-
         if intersects(pyramid_data_ext, data_limits_ext)
-            data[] = miss2nan.(
+            # @show data_limits_ext
+            return (Ref{DD.AbstractDimMatrix}(miss2nan.(
                 selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
-            )
+            )),)
+        else
+            return nothing # nothing changed so the downstream computation is not marked dirty
         end
-        nothing
     end
 
-    heatmap!(plot, plot.attributes, data)
+    heatmap!(plot, plot.attributes, plot.__pyramid_data)
 end
 
 function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
