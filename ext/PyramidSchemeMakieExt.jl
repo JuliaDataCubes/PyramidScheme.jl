@@ -83,10 +83,12 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
 
         data_limits_ext = Extent(X = extrema(first, datapos), Y = extrema(x -> x[2], datapos))
         pixel_widths = Point2f(abs.(pixelpos[2] .- pixelpos[1]))
-
+        if isnothing(cached)
+            data_limits_ext = Extent(X=first(extent(pyramid, XDim)), Y=first(extent(pyramid, YDim)))
+        end
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
         if intersects(pyramid_data_ext, data_limits_ext)
-            # @show data_limits_ext
+            #@show data_limits_ext
             return (Ref{DD.AbstractDimMatrix}(miss2nan.(
                 selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
             )),)
@@ -94,7 +96,6 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
             return nothing # nothing changed so the downstream computation is not marked dirty
         end
     end
-
     heatmap!(plot, plot.attributes, plot.__pyramid_data)
 end
 
