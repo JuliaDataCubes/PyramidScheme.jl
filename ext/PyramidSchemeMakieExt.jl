@@ -63,12 +63,12 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
     =#
     inputpositions = [Point2f(0, 0), Point2f(1, 1)]
     add_input!(plot.attributes, :__pyramid_input_positions, inputpositions)
-    Makie.register_positions_projected!(
+    Makie.register_projected_positions!(
         plot; input_space = :relative, output_space = :space,
         input_name = :__pyramid_input_positions,
         output_name = :__pyramid_dataspace_positions,
     )
-    Makie.register_positions_projected!(
+    Makie.register_projected_positions!(
         plot; input_space = :relative, output_space = :pixel,
         input_name = :__pyramid_input_positions,
         output_name = :__pyramid_pixelspace_positions,
