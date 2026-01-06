@@ -90,6 +90,10 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
             return (Ref{DD.AbstractDimMatrix}(miss2nan.(
                 selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
             )),)
+        elseif isnothing(cached)
+            return (Ref{DD.AbstractDimMatrix}(miss2nan.(
+                pyramid.levels[end][:,:]
+            )),)
         else
             return nothing # nothing changed so the downstream computation is not marked dirty
         end
