@@ -455,7 +455,12 @@ function selectlevel(pyramid, ext;target_imsize=(1024, 512))
     levels(pyramid)[n_agg][ext]
 end
 
-
+function (pyramid::Pyramid)(xrange, yrange)
+    data_limits_ext = Extent(X=(first(xrange), last(xrange)), Y=(first(yrange), last(yrange)))
+    pyramid_ext = extent(pyramid)
+    ext = switchkeys(data_limits_ext, pyramid_ext)
+    selectlevel(pyramid, ext, target_imsize=(length(xrange), length(yrange)))
+end
 
 
 xkey(keyext) = DD.name(DD.dims(keyext, XDim))
