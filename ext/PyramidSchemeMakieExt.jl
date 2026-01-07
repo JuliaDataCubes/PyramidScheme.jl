@@ -11,7 +11,7 @@ using Extents: Extent, extent, intersects
 miss2nan(x) = ismissing(x) ? NaN : x
 
 # hacks to get around DD hacks that get around Makie issues
-for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface) 
+for p in (Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface)
     f = Makie.plotkey(p)
     fbang = Symbol(f, :!)
     @eval begin
@@ -54,7 +54,7 @@ Makie.plottype(::Pyramid) = Makie.Heatmap
 
 function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
     #=
-    Go from a relative space rectangle 
+    Go from a relative space rectangle
     to the rectangle in data space and pixel space,
     thus getting `ax.finallimits` and `ax.viewport`
     respectively.
@@ -106,10 +106,36 @@ function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
 end
 Makie.boundingbox(p::Heatmap{<: Tuple{<: Pyramid}}, space::Symbol = :data) = Makie.apply_transform_and_model(p, Makie.data_limits(p))
 
+# Support for Makie.Resampler integration
+# This allows heatmap(Resampler(pyramid)) to work by providing the x, y endpoints
+
+# Helper to get x, y endpoints from a Pyramid's extent
+function _pyramid_xy_endpoints(p::Pyramid)
+    xyext = values.(extent(p, (XDim, YDim)))
+    xval, yval = first(xyext), last(xyext)
+    # Convert to Float32 endpoints matching Makie's expected format
+    x = Makie.EndPoints{Float32}(Float32(xval[1]), Float32(xval[2]))
+    y = Makie.EndPoints{Float32}(Float32(yval[1]), Float32(yval[2]))
+    return x, y
+end
+
+# Override convert_arguments for Resampler{<:Pyramid} to provide proper x, y endpoints
+# The default Resampler path calls convert_arguments(Heatmap, image.data) expecting (x, y, data)
+# but our Pyramid returns (pyramid,) - so we intercept at the Resampler level
+function Makie.convert_arguments(::Type{Heatmap}, image::Makie.Resampler{<:Pyramid})
+    x, y = _pyramid_xy_endpoints(image.data)
+    return (x, y, image)
+end
+
+function Makie.convert_arguments(::Type{Heatmap}, x, y, image::Makie.Resampler{<:Pyramid})
+    x, y, _ = Makie.convert_arguments(Heatmap, x, y, image.data)
+    return (x, y, image)
+end
+
 
 # """
 #     plot(pyramids)
-# Plot a Pyramid. 
+# Plot a Pyramid.
 # This will plot the coarsest resolution level at the beginning and will plot higher resolutions after zooming into the plot.
 # This is expected to be used with interactive Makie backends.
 # """
