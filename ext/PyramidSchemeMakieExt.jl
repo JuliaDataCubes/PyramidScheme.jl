@@ -94,8 +94,9 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
             return nothing # nothing changed so the downstream computation is not marked dirty
         end
     end
-
-    heatmap!(plot, plot.attributes, plot.__pyramid_data)
+    zoomheat = heatmap!(plot, plot.attributes, plot.__pyramid_data)
+    add_input!(plot.attributes, :__pyramid_heatmap, zoomheat)
+    zoomheat
 end
 
 function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
