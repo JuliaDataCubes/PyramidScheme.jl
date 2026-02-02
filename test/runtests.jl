@@ -180,7 +180,20 @@ end
     @test pyrsum.levels[2][10,10] == 17
 end
 
+@testitem "Plot of Pyramid" begin
+    using CairoMakie
+    a = zero(1500, 1524)
+    a[1:100, 1:100] .= 2
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
+    pyramid = Pyramid(yax)
 
+    # test that colorbar updates
+    fig, ax, plt = plot(pyramid)
+    cb = Colorbar(fig[1,2], plt.__pyramid_heatmap[])
+    @test cb.limits[] == [0.0, 2.0]
+    limits!(ax, 200,300, 200, 300)
+    @test cb.limits[] == [-0.5, 0.5]
+end
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
