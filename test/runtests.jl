@@ -182,7 +182,7 @@ end
 
 @testitem "Plot of Pyramid" begin
     using CairoMakie
-    a = zero(1500, 1524)
+    a = zeros(1500, 1524)
     a[1:100, 1:100] .= 2
     yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
     pyramid = Pyramid(yax)
