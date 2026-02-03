@@ -203,6 +203,20 @@ end
     pyr1 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16)
     pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
     @test !isequal(pyr1, pyr2)
+
+    a = fill(1, 100,100)
+    a[1:2:end, 1:2:end] .= 2
+    a[2:2:end, 2:2:end] .= 2
+    dda = DimArray(a, (X(1:100), Y(1:100)))
+    pyra = Pyramid(dda, tilesize=25)
+    
+    b = fill(2, 100,100)
+    b[1:2:end, 1:2:end] .= 1
+    b[2:2:end, 2:2:end] .= 1
+    ddb = DimArray(b, (X(1:100), Y(1:100)))
+    pyrb = Pyramid(ddb, tilesize=25)
+    @test !isequal(pyra, pyrb)
+    @test !isequal(pyra, pyr1)
 end
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
