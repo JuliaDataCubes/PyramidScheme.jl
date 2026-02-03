@@ -7,7 +7,7 @@ and the `buildpyramids` function to generate the aggregation layers for an exist
 """
 module PyramidScheme
 
-using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, MovingWindow, RegularWindows
+using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, RegularWindows
 using DiskArrayEngine: create_outwindows, engine
 using DiskArrays: DiskArrays
 #using YAXArrays: savecube

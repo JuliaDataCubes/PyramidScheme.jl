@@ -1,7 +1,8 @@
 module PyramidSchemeMakieExt
-using Makie: Makie,Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, Relative
+using Makie: Makie, Axis, Colorbar, DataAspect, Figure, FigureAxisPlot, Observable, Relative, Point2f, Rect3f
 using Makie: on, heatmap!, map!
 using Makie.ComputePipeline: add_input!
+using Makie: Heatmap, Image, Contour, Contourf, Contour3d, Spy, Surface
 
 using PyramidScheme: Pyramid, switchkeys, levels, selectlevel, xkey, ykey
 using DimensionalData: DimensionalData as DD
