@@ -168,6 +168,7 @@ end
     using DimensionalData
     pyr1 = Pyramid(fill(1,X(1:128),Y(1:128)), tilesize=16)
     pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
+
     pyr1_neg = map(x-> x-1, pyr1)
     @test all(all.(iszero, pyr1_neg.levels))
     @test iszero(pyr1_neg.base)
@@ -195,6 +196,13 @@ end
     @test cb.limits[] == [0.0, 2.0]
     limits!(ax, 200,300, 200, 300)
     @test cb.limits[] == [-0.5, 0.5]
+end
+
+@testitem "isequal of two pyramids" begin
+    using DimensionalData
+    pyr1 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16)
+    pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
+    @test !isequal(pyr1, pyr2)
 end
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin

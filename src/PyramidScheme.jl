@@ -18,8 +18,8 @@ using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
 using FillArrays: Zeros
-using Proj
-using OffsetArrays
+using Proj: Proj
+using OffsetArrays: OffsetArray
 
 using Statistics: mean
 
@@ -89,6 +89,17 @@ Return the number of levels of the `pyramid`
 nlevels(pyramid::Pyramid) = length(levels(pyramid)) - 1
 Base.parent(pyramid::Pyramid) = pyramid.base
 Base.size(pyramid::Pyramid) = size(parent(pyramid))
+function Base.isequal(pyrA::Pyramid, pyrB::Pyramid)
+    nlevela = nlevels(pyrA)
+    nlevelb = nlevels(pyrB)
+    nlevela != nlevelb && return false
+    for i in nlevela:-1:1
+        isequal(pyrA.levels[i], pyrB.levels[i]) || return false
+    end
+    return isequal(pyrA.base, pyrB.base)
+end
+
+#   all(isequal.(reverse(PyramidScheme.levels(pyrA)), reverse(PyramidScheme.levels(pyrB))))
 
 DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
 DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
