@@ -1,7 +1,7 @@
 name = "PyramidScheme"
 uuid = "ec211b67-1c2c-4319-878f-eaee078ee145"
-authors = ["Felix Cremer <fcremer@bgc-jena.mpg.de> and contributors"]
 version = "0.1.2"
+authors = ["Felix Cremer <fcremer@bgc-jena.mpg.de> and contributors"]
 
 [deps]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
@@ -35,7 +35,7 @@ ArchGDAL = "0.10.4"
 CairoMakie = "0.13, 0.14, 0.15"
 Colors = "0.12, 0.13"
 DimensionalData = "0.28, 0.29"
-DiskArrayEngine = "0.1.2, 0.2"
+DiskArrayEngine = "0.1.2, 0.2, 0.3"
 DiskArrayTools = "0.1.10"
 DiskArrays = "0.4.2"
 Extents = "0.1.3"
