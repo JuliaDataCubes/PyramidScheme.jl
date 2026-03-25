@@ -91,10 +91,11 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
         
         if intersects(pyramid_data_ext, data_limits_ext)
-            # @show data_limits_ext
-            return (Ref{DD.AbstractDimMatrix}(miss2nan.(
-                selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
-            )),)
+            # This rebuild is necessary because YAXArray broadcast makes the data a DiskArrayEngine type
+            # This happens also for in-memory arrays see YAXArray issue #579
+            intersectdata = selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
+            intersectdata = DD.rebuild(intersectdata, data=miss2nan.(intersectdata.data))
+            return (Ref{DD.AbstractDimMatrix}(intersectdata),)
         else
             return nothing # nothing changed so the downstream computation is not marked dirty
         end
