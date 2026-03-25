@@ -41,7 +41,7 @@ end
 
 function Pyramid(data::DD.AbstractDimArray; resampling_method= mean ∘ skipmissing, kwargs...)
     pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
-    levels = DD.DimArray.(pyrdata, pyraxs)
+    levels = DD.DimArray.(pyrdata, pyraxs, metadata=DD.Lookups.Metadata())
     meta = Dict(deepcopy(DD.metadata(data)))
     push!(meta, "resampling_method" => "mean_skipmissing")
     Pyramid(data, levels, meta)
@@ -320,7 +320,7 @@ function gen_output(t,s; path=tempname())
     if outsize > 100e6
         # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
         # Dummy dataset with FillArrays with the shape of the pyramidlevel
-        zcreate(t,s...;path,chunks = (1024,1024),fill_value=zero(t))
+        zcreate(t,s...;path,chunks = (1024,1024),fill_value=typemax(t))
     else
         zeros(t,s...)
     end
@@ -504,18 +504,19 @@ function trans_bounds(
 end
 
 function Base.write(path::AbstractString, pyramid::Pyramid; kwargs...)
-    savecube(parent(pyramid), path; kwargs...)
-    
-    for (i,l) in enumerate(pyramid.levels)
+    println("saving base")
+    savecube(YAB.yaxconvert(YAXArray, parent(pyramid)), path; kwargs...)
+        for (i,l) in enumerate(pyramid.levels)
+        @show i
         outpath = joinpath(path, string(i))
-        savecube(l,outpath)
+        savecube(YAB.yaxconvert(YAXArray, l),outpath)
     end
 end
 
 """
     tms_json(dimarray)
 Construct a Tile Matrix Set json description from an AbstractDimArray.
-This assumes, that we use an ag3ycgregation of two by two pixels in the spatial domain to derive the underlying layers of the pyramids. 
+This assumes, that we use an aggregation of two by two pixels in the spatial domain to derive the underlying layers of the pyramids. 
 This returns a string representation of the json and is mainly used for writing the TMS definition to the metadata of the Zarr dataset.
 """
 function tms_json(pyramid)
