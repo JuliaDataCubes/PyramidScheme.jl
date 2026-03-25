@@ -71,6 +71,7 @@ end
     using ArchGDAL: ArchGDAL as AG
     using PyramidScheme: PyramidScheme as PS
     using Rasters
+
     data = rand(2000,2000)
     r = Raster(data, (X(1:2000), Y(1:2000)))
     tname = tempname() * ".tif"
@@ -80,6 +81,19 @@ end
     @test ptif isa PS.Pyramid
     @test PS.nlevels(ptif) == 2
     sub = ptif[1:10,1:10]
+    @test sub isa PS.Pyramid
+
+    # Three dimensions
+    data = rand(2000,2000,3)
+    r = Raster(data, (X(1:2000), Y(1:2000), Band(1:3)))
+    tname = tempname() * ".tif"
+    write(tname, r, driver="cog", force=true)
+    ptif = Pyramid(tname)
+    #ras = Raster(path, lazy=true)
+    @test ptif isa PS.Pyramid
+    @test PS.nlevels(ptif) == 2
+    @test ndims(ptif) == 3
+    sub = ptif[1:10,1:10, 1]
     @test sub isa PS.Pyramid
 end
 
@@ -200,9 +214,11 @@ end
 
 @testitem "isequal of two pyramids" begin
     using DimensionalData
+    using PyramidScheme
     pyr1 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16)
     pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
     @test !isequal(pyr1, pyr2)
+    @test isequal(pyr1, deepcopy(pyr1))
 
     a = fill(1, 100,100)
     a[1:2:end, 1:2:end] .= 2
@@ -217,7 +233,24 @@ end
     pyrb = Pyramid(ddb, tilesize=25)
     @test !isequal(pyra, pyrb)
     @test !isequal(pyra, pyr1)
+    
 end
+
+@testitem "save pyramid" begin
+    using DimensionalData
+    using YAXArrays
+    using PyramidScheme
+    s = (2048, 1024)
+    a = rand(s...)
+    yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
+    pyr1 = Pyramid(yax)
+    path = tempname() * ".zarr"
+    write(path, pyr1)
+    pyrload = Pyramid(path)
+    @test isequal(pyr1, pyrload)
+end
+
+
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
