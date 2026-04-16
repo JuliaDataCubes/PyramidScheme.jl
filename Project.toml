@@ -68,3 +68,6 @@ YAXArrayBase = "90b8fcef-0c2d-428d-9c56-5f86629e9d14"
 
 [targets]
 test = ["Aqua", "ArchGDAL", "Colors", "Extents", "CairoMakie", "Rasters", "Statistics", "Test", "TestItemRunner", "YAXArrayBase"]
+
+[workspace]
+projects = ["PyramidScheme", "docs"]
