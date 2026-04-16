@@ -110,4 +110,5 @@ function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
     return rect
 end
 Makie.boundingbox(p::Heatmap{<: Tuple{<: Pyramid}}, space::Symbol = :data) = Makie.apply_transform_and_model(p, Makie.data_limits(p))
+Colorbar(fig_or_scene, p::Heatmap{<: Tuple{<: Pyramid}}; kwargs...) = Colorbar(fig_or_scene, p.__pyramid_heatmap[]; kwargs...)
 end

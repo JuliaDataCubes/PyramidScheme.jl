@@ -192,7 +192,7 @@ end
 
     # test that colorbar updates
     fig, ax, plt = plot(pyramid)
-    cb = Colorbar(fig[1,2], plt.__pyramid_heatmap[])
+    cb = Colorbar(fig[1,2], plt)
     @test cb.limits[] == [0.0, 2.0]
     limits!(ax, 200,300, 200, 300)
     @test cb.limits[] == [-0.5, 0.5]
@@ -203,6 +203,8 @@ end
     pyr1 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16)
     pyr2 = Pyramid(fill(1, X(1:128),Y(1:128)), tilesize=16, resampling_method=sum)
     @test !isequal(pyr1, pyr2)
+    @test pyr1 != pyr2
+    @test pyr1 == pyr1
 
     a = fill(1, 100,100)
     a[1:2:end, 1:2:end] .= 2
@@ -217,6 +219,8 @@ end
     pyrb = Pyramid(ddb, tilesize=25)
     @test !isequal(pyra, pyrb)
     @test !isequal(pyra, pyr1)
+    @test pyra != pyrb
+    @test pyra != pyr1
 end
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
