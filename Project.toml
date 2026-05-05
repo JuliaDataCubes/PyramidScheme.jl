@@ -51,7 +51,7 @@ Test = "1.10"
 TestItemRunner = "1"
 YAXArrayBase = "0.6.1, 0.7"
 YAXArrays = "0.5.6, 0.6, 0.7"
-Zarr = "0.9.3"
+Zarr = "0.9.3, 0.10"
 julia = "1.9"
 
 [extras]
