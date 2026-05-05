@@ -1,7 +1,7 @@
 name = "PyramidScheme"
 uuid = "ec211b67-1c2c-4319-878f-eaee078ee145"
 authors = ["Felix Cremer <fcremer@bgc-jena.mpg.de> and contributors"]
-version = "0.1.2"
+version = "0.1.3"
 
 [deps]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
@@ -68,3 +68,6 @@ YAXArrayBase = "90b8fcef-0c2d-428d-9c56-5f86629e9d14"
 
 [targets]
 test = ["Aqua", "ArchGDAL", "Colors", "Extents", "CairoMakie", "Rasters", "Statistics", "Test", "TestItemRunner", "YAXArrayBase"]
+
+[workspace]
+projects = ["PyramidScheme", "docs"]
