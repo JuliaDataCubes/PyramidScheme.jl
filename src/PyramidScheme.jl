@@ -20,6 +20,7 @@ using Extents: Extent, extent, intersects
 using FillArrays: Zeros
 using Proj: Proj
 using OffsetArrays: OffsetArray
+import Base: view
 
 using Statistics: mean
 
@@ -123,7 +124,13 @@ end
     Pyramid(newbase, A.levels, DD.metadata(A))
 end
 
-
+function Base.view(A::Pyramid, indices...; kwargs...)
+    # Maybe catch some footguns but not now
+    # For example view(A, X=50)
+    baseview = view(parent(A), indices...; kwargs...)
+    levelview = [view(levels(A,i), indices...; kwargs...) for i in 1:nlevels(A)]
+    Pyramid(baseview, levelview, A.metadata)
+end
 
 @inline function DD.rebuildsliced(f::Function, A::Pyramid, data::AbstractArray, I::Tuple, name=DD.name(A))
     newbase = DD.rebuild(parent(A), parent(data), DD.slicedims(f, A, I)..., name)
