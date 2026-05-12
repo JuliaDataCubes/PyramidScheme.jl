@@ -3,11 +3,16 @@ using ArchGDAL: ArchGDAL as AG
 using PyramidScheme: PyramidScheme as PS
 import PyramidScheme: _pyramid_gdal
 using YAXArrays
+using YAXArrayBase: yaxconvert
 using DimensionalData
 
 function _pyramid_gdal(path::AbstractString)
-    base = Cube(path)
     agbase = AG.readraster(path)
+    _pyramid_gdal(agbase)
+end
+
+function _pyramid_gdal(agbase::AG.RasterDataset)
+    base = yaxconvert(YAXArray, agbase)
     band = AG.getband(agbase,1)
     numlevels = AG.noverview(band)
 
