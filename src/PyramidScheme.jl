@@ -89,7 +89,7 @@ Return the number of levels of the `pyramid`
 nlevels(pyramid::Pyramid) = length(levels(pyramid)) - 1
 Base.parent(pyramid::Pyramid) = pyramid.base
 Base.size(pyramid::Pyramid) = size(parent(pyramid))
-function Base.isequal(pyrA::Pyramid, pyrB::Pyramid)
+function Base.:(==)(pyrA::Pyramid, pyrB::Pyramid)
     nlevela = nlevels(pyrA)
     nlevelb = nlevels(pyrB)
     nlevela != nlevelb && return false
@@ -98,6 +98,8 @@ function Base.isequal(pyrA::Pyramid, pyrB::Pyramid)
     end
     return isequal(pyrA.base, pyrB.base)
 end
+
+Base.isequal(pyrA::Pyramid, pyrB::Pyramid) = pyrA == pyrB
 
 #   all(isequal.(reverse(PyramidScheme.levels(pyrA)), reverse(PyramidScheme.levels(pyrB))))
 
