@@ -352,7 +352,6 @@ Keyword arguments are forwarded to the `fill_pyramids` function.
 """
 function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false, spatial_dims=SpatialDim)
     if YAB.backendfrompath(path) != YAB.backendlist[:zarr]
-        @show YAB.backendfrompath(path)
         throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
     end
 
@@ -526,8 +525,6 @@ function tms_json(pyramid)
     return tms
 end
 function Base.cat(A1::Pyramid, As::Pyramid...;dims)
-    println("Inside pyr cat")
-    @show typeof(levels.(As, 1))
     catlevels = [cat(A1.levels[i], levels.(As, i)...; dims) for i in eachindex(A1.levels)]
     catbase = cat(parent(A1), parent.(As)...; dims)
     Pyramid(catbase, catlevels, merge(DD.metadata(A1), DD.metadata.(As)...))
