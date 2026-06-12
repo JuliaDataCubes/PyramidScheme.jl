@@ -218,6 +218,57 @@ end
     @test !isequal(pyra, pyrb)
     @test !isequal(pyra, pyr1)
 end
+
+#@testset "WGLMakie MWE" begin
+    using WGLMakie
+    using Zarr
+    using PyramidScheme
+    using YAXArrays
+    using Statistics
+    using DimensionalData
+    a = rand(1200,1200)
+    yax1 = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
+    a2 = copy(a)
+    a2[1:end÷2, 1:end] .+= 2
+    yax2 = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a2)
+    path1 = tempname() *".zarr"
+    savecube(yax1, path1)
+    pyr1 = buildpyramids(path1, resampling_method=mean)
+    path2 = tempname() *".zarr"
+    savecube(yax2, path2)
+    pyr2 = buildpyramids(path2, resampling_method=mean)
+    pyrs = Dict("pyr1" => pyr1, "pyr2" => pyr2)
+
+    theme = Theme(fontsize=40)
+    function makefig()
+    with_theme(theme) do
+        fig = Figure()
+        ax = Axis(fig[1,1], aspect=DataAspect())
+        menu = Menu(fig[2,1], options=keys(pyrs), tellheight=false)
+        pyr = map!(Observable{Pyramid{<:Any, 2}}(), menu.selection) do sel
+            newpyr = pyrs[sel]
+            newpyr
+        end
+        hmap = heatmap!(ax, pyr; colormap=:viridis)
+        ax2 = Axis(fig[1,2], aspect=DataAspect())
+        hmap2 = heatmap!(ax2, @lift ($pyr .- pyr1); colormap=:viridis, lowclip=:transparent, colorrange=(0, Makie.automatic))
+        linkaxes!(ax, ax2)
+        ax3 = Axis(fig[1,3], aspect=DataAspect())
+        hmap3 = heatmap!(ax3, pyr .- 1; colormap=:viridis, lowclip=:transparent, colorrange=(0, Makie.automatic))
+        linkaxes!(ax, ax3)
+        fig
+    
+    end
+end
+#    fig = makefig();
+#    fig2 = makefig()
+using Bonito
+#    app = App(fig, title="App(fig)")
+
+    server = Bonito.Server(app, "0.0.0.0", 8080)
+    #hmap1 = heatmap!(ax, pyr1; colormap = :viridis)
+    #pyrmem = PS.Pyramid(yax)
+    #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
 #=
 @testitem "Comparing zarr pyramid with tif pyramid" begin
     using PyramidScheme: PyramidScheme as PS
