@@ -69,7 +69,7 @@ function _pyramid_zarr(path)
     base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
     levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
     clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
-    Pyramid(base[Ti=1], clevels, DD.metadata(base))
+    Pyramid(base, clevels, DD.metadata(base))
 end
 # refdims
 # name
