@@ -13,7 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.10'
           - '1'
           - 'nightly'
         os:
@@ -22,9 +21,6 @@ jobs:
         arch:
           - x64
         include:
-          - os: macOS-latest
-            arch: aarch64
-            version: '1.10'
           - os: macOS-latest
             arch: aarch64
             version: '1'
