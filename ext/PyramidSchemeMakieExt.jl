@@ -63,12 +63,12 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
     =#
     inputpositions = [Point2f(0, 0), Point2f(1, 1)]
     add_input!(plot.attributes, :__pyramid_input_positions, inputpositions)
-    Makie.register_positions_projected!(
+    Makie.register_projected_positions!(
         plot; input_space = :relative, output_space = :space,
         input_name = :__pyramid_input_positions,
         output_name = :__pyramid_dataspace_positions,
     )
-    Makie.register_positions_projected!(
+    Makie.register_projected_positions!(
         plot; input_space = :relative, output_space = :pixel,
         input_name = :__pyramid_input_positions,
         output_name = :__pyramid_pixelspace_positions,
@@ -89,12 +89,13 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
         pixel_widths = Point2f(abs.(pixelpos[2] .- pixelpos[1]))
 
         datalimit = switchkeys(data_limits_ext, pyramid_ext)
-        
+
         if intersects(pyramid_data_ext, data_limits_ext)
             # This rebuild is necessary because YAXArray broadcast makes the data a DiskArrayEngine type
             # This happens also for in-memory arrays see YAXArray issue #579
             intersectdata = selectlevel(pyramid, datalimit, target_imsize = pixel_widths)
             intersectdata = DD.rebuild(intersectdata, data=miss2nan.(intersectdata.data))
+            any(iszero, size(intersectdata)) && return nothing
             return (Ref{DD.AbstractDimMatrix}(intersectdata),)
         else
             return nothing # nothing changed so the downstream computation is not marked dirty
@@ -102,7 +103,7 @@ function Makie.plot!(plot::Heatmap{<: Tuple{<: Pyramid}})
     end
     zoomheat = heatmap!(plot, plot.attributes, plot.__pyramid_data)
     add_input!(plot.attributes, :__pyramid_heatmap, zoomheat)
-    zoomheat
+    plot
 end
 
 function Makie.data_limits(p::Heatmap{<: Tuple{<: Pyramid}})
