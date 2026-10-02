@@ -61,12 +61,16 @@ function Pyramid(path::AbstractString, backend)
         """))
     end
 end
+Pyramid(zgroup::Zarr.ZGroup) = _pyramid_zarr(zgroup)
 function _pyramid_gdal end
 
 function _pyramid_zarr(path)
     g = zopen(path)
+    _pyramid_zarr(g)
+end
+function _pyramid_zarr(g::Zarr.ZGroup)
     allkeys = collect(keys(g.groups))
-    base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
+    base = Cube(open_dataset(g)) # This getindex should be unnecessary and I should rather fix my data on disk
     levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
     clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
     Pyramid(base[Ti=1], clevels, DD.metadata(base))
