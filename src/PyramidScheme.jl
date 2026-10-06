@@ -18,7 +18,6 @@ using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
 using FillArrays: Zeros
-using Proj: Proj
 using OffsetArrays: OffsetArray
 
 using Statistics: mean
@@ -491,20 +490,6 @@ function switchkeys(dataext, keyext)
     yk = ykey(keyext)
     nt = NamedTuple{(xk, yk)}((dataext.X, dataext.Y))
     Extent(nt)
-end
-
-"""
-    trans_bounds(trans::Proj.Transformation, bbox::Extent, densify_pts::Integer)
-Compute the projection of `bbox` with the transformation `trans`. 
-This is used to project the data on the fly to another transformation.
-"""
-function trans_bounds(
-    trans::Proj.Transformation,
-    bbox::Extent,
-    densify_pts::Integer = 21,
-)::Extent
-    xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
-    return Extent(X = xlims, Y = ylims)
 end
 
 function write(path, pyramid::Pyramid; kwargs...)
