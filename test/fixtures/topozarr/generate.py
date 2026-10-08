@@ -21,6 +21,7 @@ cases = {
     "projected": (dataset(32, 32, "EPSG:3857", time=2, res=100.0), dict(levels=2)),
     "sparse_factors": (dataset(64, 48, "EPSG:4326"), dict(factors=[1, 2, 8])),
     "sum": (dataset(32, 32, "EPSG:4326"), dict(levels=2, method="sum")),
+    "odd_size": (dataset(50, 30, "EPSG:4326"), dict(levels=3)),
 }
 for name, (ds, kw) in cases.items():
     p = create_pyramid(ds, x_dim="x", y_dim="y", **kw)

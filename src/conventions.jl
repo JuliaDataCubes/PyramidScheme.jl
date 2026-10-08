@@ -150,16 +150,26 @@ Throws an `ArgumentError` when `d` is not regularly spaced.
 A dimension of length one has no spacing, so `fallback` is returned instead.
 """
 function cellsize(d; fallback=nothing)
-    vals = DD.lookup(d)
-    if length(vals) < 2
+    if length(d) < 2
         fallback === nothing &&
             throw(ArgumentError("Can not infer the cell size of dimension $(DD.name(d)) from a single value"))
         return Float64(fallback)
     end
-    steps = diff(Float64.(collect(vals)))
-    all(s -> isapprox(s, first(steps); rtol=1e-5), steps) ||
-        throw(ArgumentError("Dimension $(DD.name(d)) is not regularly spaced"))
-    first(steps)
+    step = regular_step(d)
+    step === nothing && throw(ArgumentError("Dimension $(DD.name(d)) is not regularly spaced"))
+    step
+end
+
+"""
+    regular_step(d)
+
+Return the distance between neighbouring values of the dimension `d`,
+or `nothing` when `d` is shorter than two or not regularly spaced.
+"""
+function regular_step(d)
+    length(d) < 2 && return nothing
+    steps = diff(Float64.(collect(DD.lookup(d))))
+    all(s -> isapprox(s, first(steps); rtol=1e-5), steps) ? first(steps) : nothing
 end
 
 """

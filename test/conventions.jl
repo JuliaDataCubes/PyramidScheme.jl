@@ -254,11 +254,14 @@ end
         ("projected", griddims(32, 32; time=2, res=100.0), [1, 2], "EPSG:3857", mean),
         ("sparse_factors", griddims(64, 48), [1, 2, 8], "EPSG:4326", mean ∘ skipmissing),
         ("sum", griddims(32, 32), [1, 2], "EPSG:4326", sum),
+        ("odd_size", griddims(50, 30), [1, 2, 4], "EPSG:4326", mean),
     ]
     s = schemas()
     for (name, dims, factors, crs, method) in cases
         expected = JSON.parsefile(joinpath(fixtures, "$name.json"))
-        attrs = PS.multiscales_group_attrs(pyramid_dims(dims, factors; spatial_dims), factors;
+        # topozarr drops partial windows at the edges
+        leveldims = [PS.level_dims(dims, f; edges=:drop, spatial_dims) for f in factors]
+        attrs = PS.multiscales_group_attrs(leveldims, factors;
             crs, resampling_method=method, spatial_dims, style=PS.CellCenterStyle())
         node = group_node(attrs)
         ours = node["attributes"]
