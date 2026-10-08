@@ -54,20 +54,10 @@ end
 
 function read_level(g, asset)
     node = zarr_node(g, asset)
-    node isa ZarrCore.ZGroup && return Cube(open_level_group(node))
+    node isa ZarrCore.ZGroup && return Cube(open_dataset(node))
     parts = split(asset, '/')
     parentgroup = length(parts) == 1 ? g : zarr_node(g, join(parts[1:end-1], '/'))
-    open_level_group(parentgroup).cubes[Symbol(last(parts))]
-end
-
-# Scalar arrays, such as the CRS variable spatial_ref written by xarray, are not part of the level data.
-# They are hidden from YAXArrays by opening a copy of the group without them: xarray writes them without
-# dimension_names, which YAXArrayBase can not read, and skip_keys only applies after reading the dimensions.
-function open_level_group(group)
-    arrays = filter(((_, a),) -> ndims(a) > 0, group.arrays)
-    length(arrays) == length(group.arrays) && return open_dataset(group)
-    open_dataset(ZarrCore.ZGroup(group.storage, group.path, arrays, group.groups, group.attrs,
-        group.writeable, group.zarr_format))
+    open_dataset(parentgroup).cubes[Symbol(last(parts))]
 end
 
 function zarr_node(g, asset)
