@@ -83,9 +83,10 @@ end
     @test sub isa PS.Pyramid
 end
 
-@testitem "Zarr build Pyramid inplace" begin
+@testitem "Zarr build Pyramid" begin
     using Zarr
     using PyramidScheme
+    using PyramidScheme: PyramidScheme as PS
     using YAXArrays
     using Statistics
     using DimensionalData
@@ -93,13 +94,17 @@ end
     yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2))), a)
     path = tempname() *".zarr"
     savecube(yax, path)
-    pyr = buildpyramids(path, resampling_method=mean)
+    dest = tempname() * ".zarr"
+    pyr = buildpyramids(path, dest, resampling_method=mean)
     @test pyr isa Pyramid
-    pyrdisk = Pyramid(path)
-    @test pyrdisk isa Pyramid 
-    @test pyr == pyrdisk
-    #pyrmem = PS.Pyramid(yax)
-    #@test pyrmem.levels[end][1,1] == pyr.levels[end][1,1]
+    @test PS.nlevels(pyr) == 3
+    @test parent(pyr)[:, :] == a
+    pyrmem = Pyramid(yax; resampling_method=mean)
+    for l in 1:3
+        @test Array(parent(PS.levels(pyr, l))) ≈ parent(PS.levels(pyrmem, l))
+    end
+    # Building inside the source is not possible with the multiscales layout
+    @test_throws ArgumentError buildpyramids(path)
 end
 
 @testitem "selectlevel" begin
@@ -154,14 +159,11 @@ end
     yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2)), Z(1:3)), a)
     path = tempname() *".zarr"
     savecube(yax, path)
-    pyr = buildpyramids(path, resampling_method=sum)
-    pyrdisk = Pyramid(path)
-    for p in [pyr, pyrdisk]
-        @test p isa Pyramid
-        @test length(dims(p)) == 3
-        @test size(p.levels[end]) == (256,128,3)
-        @test p.levels[1][1,1,1] == 4
-    end
+    pyr = buildpyramids(path, tempname() * ".zarr", resampling_method=sum)
+    @test pyr isa Pyramid
+    @test length(dims(pyr)) == 3
+    @test size(pyr.levels[end]) == (256,128,3)
+    @test pyr.levels[1][1,1,1] == 4
 
 end
 @testitem "Map of pyramids" begin

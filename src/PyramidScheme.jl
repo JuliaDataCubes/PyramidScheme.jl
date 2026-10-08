@@ -11,8 +11,11 @@ using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, Regular
 using DiskArrayEngine: create_outwindows, engine
 using DiskArrays: DiskArrays
 using YAXArrayBase: YAXArrayBase as YAB
-using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
-using Zarr: Zarr, zcreate, zopen
+using YAXArrays: Cube, YAXArray, to_dataset, savedataset, savecube, setchunks, open_dataset
+using ZarrCore: ZarrCore, zcreate, zopen, zgroup
+using ZarrZstd: ZarrZstd
+# Loaded so that Blosc compressed stores, e.g. older pyramids, can be read
+using ZarrBlosc: ZarrBlosc
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
@@ -22,7 +25,7 @@ using OffsetArrays: OffsetArray
 
 using Statistics: mean, median
 
-export Pyramid, buildpyramids
+export Pyramid, buildpyramids, ConventionStyle, CellCenterStyle
 
 """
     Pyramid
@@ -51,7 +54,7 @@ function Pyramid(data::DD.AbstractDimArray; resampling_method= mean ∘ skipmiss
     pyrdata, pyraxs = getpyramids(resampling_method, data; kwargs...)
     levels = DD.DimArray.(pyrdata, pyraxs)
     meta = Dict(deepcopy(DD.metadata(data)))
-    push!(meta, "resampling_method" => "mean_skipmissing")
+    push!(meta, "resampling_method" => resampling_method_name(resampling_method))
     Pyramid(data, levels, meta)
 end
 
@@ -334,81 +337,6 @@ Union of Dimensions which are assumed to be in space and are therefore used in t
 SpatialDim = (DD.Dimensions.XDim, DD.Dimensions.YDim)
 
 """
-    buildpyramids(path; resampling_method=mean)
-Build the pyramids for the zarr dataset at `path` and write the pyramid layers into the zarr folder.
-The different scales are written according to the GeoZarr spec and a multiscales entry is added to the attributes of the zarr dataset.
-The data is aggregated with the specified `resampling_method`. 
-Keyword arguments are forwarded to the `fill_pyramids` function.
-"""
-function buildpyramids(path::AbstractString; resampling_method=mean, recursive=true, runner=LocalRunner, verbose=false, spatial_dims=SpatialDim)
-    if YAB.backendfrompath(path) != YAB.backendlist[:zarr]
-        throw(ArgumentError("$path  is not a Zarr dataset therefore we can't build the Pyramids inplace"))
-    end
-
-    # Should this be a dataset not a Cube?
-    # Build a loop for all variables in a dataset?
-    org = Cube(path)
-    # We run the method once to derive the output type
-    #tfunc = typeof(resampling_method(zeros(eltype(org), 2,2)))
-    #t = Missing <: eltype(org) ? Union{Missing, tfunc} : tfunc
-
-    t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(org))},))
-    factors = pyramid_factors(default_nlevels=compute_nlevels(org))
-    n_level = length(factors) - 1
-    input_axes = DD.dims(org, spatial_dims)
-    if length(input_axes) != 2
-        throw(ArgumentError("Expected two spatial dimensions got $input_axes"))
-    end
-    pyraxs = [level_dims(DD.dims(org), f; spatial_dims) for f in factors[2:end]]
-    outarrs = [output_zarr(pyraxs[n], t, joinpath(path, string(n)), spatial_dims) for n in 1:n_level]
-
-    verbose && println("Constructing output arrays")
-    verbose && println("Start computation")
-    ispatial_dims = DD.dimnum(DD.dims(org),spatial_dims)
-    fill_pyramids(org, outarrs, resampling_method, recursive, ispatial_dims, factors;runner)
-    pyrlevels = DD.DimArray.(outarrs, pyraxs)
-    meta = Dict(deepcopy(DD.metadata(org)))
-    push!(meta, "resampling_method" => string(resampling_method))
-    multiscale = Dict{String, Any}()
-    push!(multiscale, "datasets" => [Dict("path" => p) for p in ["", string.(1:n_level)...]])
-    push!(multiscale, "type" => "reduce")
-    push!(meta, "multiscales" => [multiscale,])
-    # Zarr 0.11 has no public function to update the attributes of an existing group.
-    # Temporary until buildpyramids writes a new store and sets the attributes in zgroup.
-    g = zopen(path, "w")
-    Zarr.ZarrCore.writeattrs(g.zarr_format, g.storage, g.path, meta)
-    Pyramid(org, pyrlevels, meta)
-    # Construct the TMS metadata from the info of the array
-    # Save TMS to the .zattrs of the original data
-end
-
-# TODO: Decide on how we count levels rather from the bottom to the top or the other way around.
-# I find bottom to top more intuitive but TMS specifies it differently
-
-"""
-    output_zarr(leveldims, t, path, spatialdims)
-
-Construct an empty Zarr dataset at `path` for a pyramid level with the dimensions `leveldims`
-and element type `t`.
-"""
-function output_zarr(leveldims, t, path, spatialdims;chunksizes=nothing)
-    s = length.(leveldims)
-    z = Zeros(t, s...)
-    yax = YAXArray(leveldims, z)
-    if chunksizes === nothing
-        dchunksizes = map(d->DD.rebuild(d,1),leveldims)
-        dchunksizes = DD.setdims(dchunksizes,map(d->DD.rebuild(d,1024),DD.dims(leveldims,spatialdims)))
-        chunksizes = map(i->i.val,dchunksizes)
-    end
-    chunked = setchunks(yax , chunksizes)
-    # This assumes that there is only the spatial dimensions to save
-    ds = to_dataset(chunked, )
-    dssaved = savedataset(ds; path, skeleton=true, driver=:zarr)
-    zar = dssaved.layer.data
-    zar
-end 
-
-"""
     getpyramids(reducefunc, ras; recursive=true, tilesize=256, nlevels=nothing, factors=nothing, edges=:keep, spatial_dims=SpatialDim)
 Compute the data of the pyramids of a given data cube `ras`.
 This returns the data of the pyramids and the dimensions of the levels.
@@ -509,5 +437,6 @@ end
 
 include("conventions.jl")
 include("levels.jl")
+include("writer.jl")
 include("broadcast.jl")
 end
