@@ -103,6 +103,7 @@ end
     for l in 1:3
         @test Array(parent(PS.levels(pyr, l))) ≈ parent(PS.levels(pyrmem, l))
     end
+    @test Pyramid(dest) == pyr
     # Building inside the source is not possible with the multiscales layout
     @test_throws ArgumentError buildpyramids(path)
 end
@@ -159,11 +160,15 @@ end
     yax = YAXArray((X(1.:size(a,1)),Y(1.:size(a,2)), Z(1:3)), a)
     path = tempname() *".zarr"
     savecube(yax, path)
-    pyr = buildpyramids(path, tempname() * ".zarr", resampling_method=sum)
-    @test pyr isa Pyramid
-    @test length(dims(pyr)) == 3
-    @test size(pyr.levels[end]) == (256,128,3)
-    @test pyr.levels[1][1,1,1] == 4
+    dest = tempname() * ".zarr"
+    pyr = buildpyramids(path, dest, resampling_method=sum)
+    pyrdisk = Pyramid(dest)
+    for p in [pyr, pyrdisk]
+        @test p isa Pyramid
+        @test length(dims(p)) == 3
+        @test size(p.levels[end]) == (256,128,3)
+        @test p.levels[1][1,1,1] == 4
+    end
 
 end
 @testitem "Map of pyramids" begin

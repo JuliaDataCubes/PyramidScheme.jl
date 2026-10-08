@@ -28,3 +28,9 @@ for name, (ds, kw) in cases.items():
     with open(f"{out}/{name}.json", "w") as f:
         json.dump(p.attrs, f, indent=1)
     print(name, list(p.attrs["multiscales"]["layout"][1]["transform"].items()))
+
+# A small store written by topozarr, read back by the tests
+if len(sys.argv) > 2:
+    ds = dataset(32, 32, "EPSG:4326")
+    ds["v"].values[:] = np.arange(32 * 32, dtype="float32").reshape(32, 32)
+    create_pyramid(ds, levels=2, x_dim="x", y_dim="y").write(sys.argv[2])

@@ -74,14 +74,6 @@ function Pyramid(path::AbstractString, backend)
 end
 function _pyramid_gdal end
 
-function _pyramid_zarr(path)
-    g = zopen(path)
-    allkeys = collect(keys(g.groups))
-    base = Cube(path)
-    levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
-    clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
-    Pyramid(base, clevels, DD.metadata(base))
-end
 # refdims
 # name
 
@@ -384,9 +376,10 @@ function selectlevel(pyramid, ext;target_imsize=(1024, 512))
         imsize = ext[bb][2] - ext[bb][1]
         imsize / pyrspan * size(pyramid, bb)
     end
-    dimlevels = log2.(basepixels ./ target_imsize)
-    minlevel = maximum(dimlevels)
-    n_agg = min(max(ceil(Int,minlevel),0),nlevels(pyramid))
+    # The finest level whose cells cover enough base cells to fit into target_imsize
+    needed = maximum(basepixels ./ target_imsize)
+    factors = level_factors(pyramid)
+    n_agg = something(findfirst(>=(needed), factors), length(factors)) - 1
     @debug "Selected level $n_agg"
     levels(pyramid)[n_agg][ext]
 end
@@ -438,5 +431,6 @@ end
 include("conventions.jl")
 include("levels.jl")
 include("writer.jl")
+include("reader.jl")
 include("broadcast.jl")
 end
