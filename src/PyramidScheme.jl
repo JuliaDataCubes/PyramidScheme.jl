@@ -20,7 +20,7 @@ using FillArrays: Zeros
 using Proj: Proj
 using OffsetArrays: OffsetArray
 
-using Statistics: mean
+using Statistics: mean, median
 
 export Pyramid, buildpyramids
 
@@ -512,5 +512,6 @@ end
 
 
 
+include("conventions.jl")
 include("broadcast.jl")
 end
