@@ -1,6 +1,6 @@
 name = "PyramidScheme"
 uuid = "ec211b67-1c2c-4319-878f-eaee078ee145"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Felix Cremer <fcremer@bgc-jena.mpg.de> and contributors"]
 
 [workspace]
