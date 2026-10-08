@@ -78,23 +78,19 @@ end
     using DimensionalData
     using Statistics
 
+    # Sharded arrays, xarray coordinates and a scalar spatial_ref array without dimension_names
     path = joinpath(@__DIR__, "fixtures", "topozarr", "store.zarr")
-    pyr = try
-        Pyramid(path)
-    catch e
-        e isa ArgumentError || rethrow()
-        nothing
-    end
-    # YAXArrayBase can not open the scalar spatial_ref array yet, as it has no dimension_names
-    # (fix pending on la/zarrcore). Turn into @test once it can.
-    @test_broken pyr isa Pyramid
-    if pyr isa Pyramid
-        @test size(parent(pyr)) == (32, 32)
-        @test size.(pyr.levels) == [(16, 16)]
-        base, level = Array(parent(parent(pyr))), Array(parent(pyr.levels[1]))
-        @test all(level[i, j] ≈ mean(base[2i-1:2i, 2j-1:2j]) for i in 1:16, j in 1:16)
-        @test metadata(pyr)["proj:code"] == "EPSG:4326"
-    end
+    pyr = Pyramid(path)
+    @test pyr isa Pyramid
+    @test size(parent(pyr)) == (32, 32)
+    @test size.(pyr.levels) == [(16, 16)]
+    @test name.(dims(parent(pyr))) == (:x, :y)
+    base, level = Array(parent(parent(pyr))), Array(parent(pyr.levels[1]))
+    # Values written by generate.py: v[y, x] = 32 * y + x, zero based
+    @test base[3, 2] == 32 + 2
+    @test all(level[i, j] ≈ mean(base[2i-1:2i, 2j-1:2j]) for i in 1:16, j in 1:16)
+    @test collect(lookup(pyr.levels[1], Dim{:x}))[1:2] == [0.5, 2.5]
+    @test metadata(pyr)["proj:code"] == "EPSG:4326"
 end
 
 @testitem "Select levels with arbitrary factors" begin

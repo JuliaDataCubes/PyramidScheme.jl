@@ -46,11 +46,9 @@
         @test data["dimension_names"] == ["Y", "X"]
         @test data["shape"] == entry["spatial:shape"]
         @test "zstd" in [c["name"] for c in data["codecs"]]
-        # YAXArrayBase does not pass the compressor on to coordinate arrays yet (fix pending on la/zarrcore),
-        # turn into @test once it does
         for name in ("X", "Y")
             coord = JSON.parsefile(joinpath(dest, level, name, "zarr.json"))
-            @test_broken "zstd" in [c["name"] for c in coord["codecs"]]
+            @test "zstd" in [c["name"] for c in coord["codecs"]]
         end
     end
 
