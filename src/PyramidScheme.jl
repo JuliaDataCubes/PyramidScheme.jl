@@ -10,10 +10,9 @@ module PyramidScheme
 using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, RegularWindows
 using DiskArrayEngine: create_outwindows, engine
 using DiskArrays: DiskArrays
-#using YAXArrays: savecube
 using YAXArrayBase: YAXArrayBase as YAB
 using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
-using Zarr: Zarr, zcreate, zopen, writeattrs
+using Zarr: Zarr, zcreate, zopen
 using DimensionalData: DimensionalData as DD
 using DimensionalData.Dimensions: XDim, YDim
 using Extents: Extent, extent, intersects
@@ -66,10 +65,10 @@ function _pyramid_gdal end
 function _pyramid_zarr(path)
     g = zopen(path)
     allkeys = collect(keys(g.groups))
-    base = Cube(path) # This getindex should be unnecessary and I should rather fix my data on disk
+    base = Cube(path)
     levavail = extrema(parse.(Int,allkeys[contains.(allkeys, r"\d")]))
     clevels = [Cube(open_dataset(g[string(l)])) for l in 1:last(levavail)]
-    Pyramid(base[Ti=1], clevels, DD.metadata(base))
+    Pyramid(base, clevels, DD.metadata(base))
 end
 # refdims
 # name
@@ -382,11 +381,13 @@ function buildpyramids(path::AbstractString; resampling_method=mean, recursive=t
     meta = Dict(deepcopy(DD.metadata(org)))
     push!(meta, "resampling_method" => string(resampling_method))
     multiscale = Dict{String, Any}()
-    push!(multiscale, "datasets" => ["path"=> "", ["path" => string(i) for i in 1:n_level]...])
+    push!(multiscale, "datasets" => [Dict("path" => p) for p in ["", string.(1:n_level)...]])
     push!(multiscale, "type" => "reduce")
     push!(meta, "multiscales" => [multiscale,])
-    storage, basepath = Zarr.storefromstring(path)
-    writeattrs(storage,basepath, meta)
+    # Zarr 0.11 has no public function to update the attributes of an existing group.
+    # Temporary until buildpyramids writes a new store and sets the attributes in zgroup.
+    g = zopen(path, "w")
+    Zarr.ZarrCore.writeattrs(g.zarr_format, g.storage, g.path, meta)
     Pyramid(org, pyrlevels, meta)
     # Construct the TMS metadata from the info of the array
     # Save TMS to the .zattrs of the original data
@@ -503,29 +504,6 @@ function trans_bounds(
     return Extent(X = xlims, Y = ylims)
 end
 
-function write(path, pyramid::Pyramid; kwargs...)
-    savecube(parent(pyramid), path; kwargs...)
-    
-    for (i,l) in enumerate(reverse(pyramid.levels))
-        outpath = joinpath(path, string(i-1))
-        savecube(l,outpath)
-    end
-end
-
-"""
-    tms_json(dimarray)
-Construct a Tile Matrix Set json description from an AbstractDimArray.
-This assumes, that we use an ag3ycgregation of two by two pixels in the spatial domain to derive the underlying layers of the pyramids. 
-This returns a string representation of the json and is mainly used for writing the TMS definition to the metadata of the Zarr dataset.
-"""
-function tms_json(pyramid)
-    tms = Dict{String, Any}()
-    push!(tms, "id"=>"TMS_$(string(DD.name(pyramid)))")
-    push!(tms, "title" => "TMS of $(crs(pyramid)) for pyramid")
-    push!(tms, "crs" => string(crs(pyramid)))
-    push!(tms, "orderedAxes" => pyramidaxes())
-    return tms
-end
 function Base.cat(A1::Pyramid, As::Pyramid...;dims)
     catlevels = [cat(A1.levels[i], levels.(As, i)...; dims) for i in eachindex(A1.levels)]
     catbase = cat(parent(A1), parent.(As)...; dims)
