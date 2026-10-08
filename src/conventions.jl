@@ -43,11 +43,57 @@ const SPATIAL_CONVENTION = Convention("spatial", "v0.1",
     "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4", "spatial", "Spatial coordinate information")
 
 """
-    resampling_method_name(f)
+    MultiscalesStyle
+
+How the `multiscales` metadata is written where existing writers differ in their reading
+of the convention:
+
+- [`ConventionStyle`](@ref) follows the README and examples of the multiscales convention.
+- [`CellCenterStyle`](@ref) measures translations between cell centers, as topozarr does,
+  for clients built against that output.
+"""
+abstract type MultiscalesStyle end
+
+"""
+    ConventionStyle()
+
+Write the `multiscales` metadata as in the README and examples of the multiscales convention:
+the `translation` between levels is zero, level 0 has an identity `transform`,
+and resampling methods use the names listed by the convention (`"average"` for `mean`).
+"""
+struct ConventionStyle <: MultiscalesStyle end
+
+"""
+    CellCenterStyle()
+
+Write the `multiscales` metadata with translations measured between cell centers:
+the `translation` between levels is `(step - 1) / 2` along the spatial dimensions,
+level 0 has no `transform`, and `mean` is named `"mean"`.
+This is the metadata written by topozarr (https://github.com/carbonplan/topozarr).
+"""
+struct CellCenterStyle <: MultiscalesStyle end
+
+level_translation(::ConventionStyle, step) = 0.0
+level_translation(::CellCenterStyle, step) = (step - 1) / 2
+
+has_base_transform(::ConventionStyle) = true
+has_base_transform(::CellCenterStyle) = false
+
+const CELLCENTER_METHOD_NAMES = Dict("average" => "mean", "med" => "median")
+
+resampling_method_name(::ConventionStyle, f) = resampling_method_name(f)
+function resampling_method_name(::CellCenterStyle, f)
+    name = resampling_method_name(f)
+    get(CELLCENTER_METHOD_NAMES, name, name)
+end
+
+"""
+    resampling_method_name([style,] f)
 
 Return the name of the aggregation function `f` as used in the `resampling_method` field of the
 multiscales convention, e.g. `"average"` for `mean`.
 `mean ∘ skipmissing` is named after `mean`. Unknown functions fall back to `string(f)`.
+With a [`MultiscalesStyle`](@ref) the name follows that style.
 """
 resampling_method_name(f) = string(f)
 resampling_method_name(f::ComposedFunction) =
@@ -65,15 +111,24 @@ resampling_method_name(::ESALCMode) = "mode"
 
 Return the `proj:` attributes for `crs`, which can be anything `Proj.CRS` accepts,
 e.g. `"EPSG:4326"`, a WKT string or a GeoFormatTypes CRS.
-`proj:wkt2` is always written. `proj:code` is only written when the CRS has an authority code,
-or one is identified with full confidence.
+`proj:wkt2` is always written, on a single line. `proj:code` is only written when the CRS has an
+authority code, or one is identified with full confidence.
 """
 function proj_attrs(crs)
     pcrs = crs isa Proj.CRS ? crs : Proj.CRS(crs)
-    attrs = Dict{String,Any}("proj:wkt2" => Proj.proj_as_wkt(pcrs, Proj.PJ_WKT2_2019))
+    attrs = Dict{String,Any}("proj:wkt2" => wkt2(pcrs))
     code = authority_code(pcrs)
     code === nothing || (attrs["proj:code"] = code)
     attrs
+end
+
+function wkt2(pcrs::Proj.CRS)
+    option = "MULTILINE=NO"
+    GC.@preserve option begin
+        # NULL terminated list of PROJ options
+        options = [Base.unsafe_convert(Cstring, option), reinterpret(Cstring, C_NULL)]
+        GC.@preserve options Proj.proj_as_wkt(pcrs, Proj.PJ_WKT2_2019, pointer(options))
+    end
 end
 
 function authority_code(pcrs::Proj.CRS)
@@ -184,7 +239,7 @@ function check_factors(factors)
 end
 
 """
-    multiscales_attrs(leveldims, factors; resampling_method, recursive=true, spatial_dims=SpatialDim)
+    multiscales_attrs(leveldims, factors; resampling_method, recursive=true, spatial_dims=SpatialDim, style=ConventionStyle())
 
 Return the value of the `multiscales` attribute for a pyramid whose level `i` (starting at 0)
 has the dimensions `leveldims[i+1]` and is downsampled by the cumulative factor `factors[i+1]`
@@ -194,12 +249,15 @@ Every level is stored in the child group named after its index. With `recursive=
 is derived from the previous one, otherwise all levels are derived from level 0.
 `scale` and `translation` list every dimension in stored (row-major) order,
 the reverse of the Julia order.
+`style` selects how translations, the `transform` of level 0 and the resampling method name are
+written, see [`MultiscalesStyle`](@ref).
 """
-function multiscales_attrs(leveldims, factors; resampling_method, recursive=true, spatial_dims=SpatialDim)
+function multiscales_attrs(leveldims, factors; resampling_method, recursive=true, spatial_dims=SpatialDim,
+    style::MultiscalesStyle=ConventionStyle())
     length(leveldims) == length(factors) ||
         throw(ArgumentError("Got $(length(leveldims)) levels but $(length(factors)) factors"))
     check_factors(factors)
-    method = resampling_method_name(resampling_method)
+    method = resampling_method_name(style, resampling_method)
     xdim0, ydim0 = DD.dims(first(leveldims), spatial_dims)
     res0 = cellsize(xdim0), cellsize(ydim0)
     layout = map(enumerate(zip(leveldims, factors))) do (i, (dims, factor))
@@ -209,13 +267,15 @@ function multiscales_attrs(leveldims, factors; resampling_method, recursive=true
         xdim, ydim = DD.dims(dims, spatial_dims)
         level = Dict{String,Any}(
             "asset" => string(i - 1),
-            "transform" => Dict{String,Any}(
-                "scale" => [s ? Float64(step) : 1.0 for s in isspatial],
-                "translation" => zeros(length(dims)),
-            ),
             "spatial:transform" => spatial_transform(xdim, ydim; fallback_res=res0 .* factor),
             "spatial:shape" => [length(ydim), length(xdim)],
         )
+        if source !== nothing || has_base_transform(style)
+            level["transform"] = Dict{String,Any}(
+                "scale" => [s ? Float64(step) : 1.0 for s in isspatial],
+                "translation" => [s ? level_translation(style, step) : 0.0 for s in isspatial],
+            )
+        end
         if source !== nothing
             level["derived_from"] = string(source - 1)
             level["resampling_method"] = method
@@ -226,7 +286,7 @@ function multiscales_attrs(leveldims, factors; resampling_method, recursive=true
 end
 
 """
-    multiscales_group_attrs(leveldims, factors; crs=nothing, resampling_method, recursive=true, spatial_dims=SpatialDim)
+    multiscales_group_attrs(leveldims, factors; crs=nothing, resampling_method, recursive=true, spatial_dims=SpatialDim, style=ConventionStyle())
 
 Return the attributes of the root group of a multiscale store: the `zarr_conventions` registry,
 the `multiscales` layout, the `spatial:` attributes of level 0 and,
@@ -234,12 +294,12 @@ when `crs` is given, the `proj:` attributes.
 See [`multiscales_attrs`](@ref) for the meaning of the other arguments.
 """
 function multiscales_group_attrs(leveldims, factors; crs=nothing, resampling_method, recursive=true,
-    spatial_dims=SpatialDim)
+    spatial_dims=SpatialDim, style::MultiscalesStyle=ConventionStyle())
     conventions = crs === nothing ? [MULTISCALES_CONVENTION, SPATIAL_CONVENTION] :
                   [MULTISCALES_CONVENTION, PROJ_CONVENTION, SPATIAL_CONVENTION]
     attrs = Dict{String,Any}("zarr_conventions" => convention_attrs.(conventions))
     crs === nothing || merge!(attrs, proj_attrs(crs))
     merge!(attrs, spatial_attrs(DD.dims(first(leveldims), spatial_dims)...))
-    attrs["multiscales"] = multiscales_attrs(leveldims, factors; resampling_method, recursive, spatial_dims)
+    attrs["multiscales"] = multiscales_attrs(leveldims, factors; resampling_method, recursive, spatial_dims, style)
     attrs
 end

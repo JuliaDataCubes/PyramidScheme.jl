@@ -33,8 +33,8 @@ function coarsen_dim(d, factor)
     DD.basetypeof(d)(range(corner + newres / 2; step=newres, length=cld(length(d), factor)))
 end
 
-pyramid_dims(dims, factors) =
-    [map(d -> d isa Union{DD.XDim,DD.YDim} ? coarsen_dim(d, f) : d, dims) for f in factors]
+pyramid_dims(dims, factors; spatial_dims=(DD.XDim, DD.YDim)) =
+    [map(d -> DD.hasdim(DD.dims(dims, spatial_dims), d) ? coarsen_dim(d, f) : d, dims) for f in factors]
 end
 
 @testitem "Convention entries match the schemas" setup = [ConventionHelpers] begin
@@ -232,4 +232,72 @@ end
             @test ours[key] == value
         end
     end
+end
+
+@testitem "CellCenterStyle matches topozarr" setup = [ConventionHelpers] begin
+    using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
+    using JSON
+    using Statistics
+
+    fixtures = joinpath(@__DIR__, "fixtures", "topozarr")
+    spatial_dims = (Dim{:x}, Dim{:y})
+    # Same datasets as fixtures/topozarr/generate.py: north up, x and y starting at 0
+    function griddims(nx, ny; time=nothing, res=1.0)
+        dims = (Dim{:x}(range(0.0; step=res, length=nx)), Dim{:y}(range((ny - 1) * res; step=-res, length=ny)))
+        time === nothing ? dims : (dims..., Dim{:time}(0:time-1))
+    end
+    cases = [
+        ("square", griddims(32, 32), [1, 2, 4], "EPSG:4326", mean),
+        ("non_square", griddims(48, 32), [1, 2, 4], "EPSG:4326", mean),
+        ("extra_dim", griddims(32, 32; time=3), [1, 2, 4], "EPSG:4326", mean),
+        ("projected", griddims(32, 32; time=2, res=100.0), [1, 2], "EPSG:3857", mean),
+        ("sparse_factors", griddims(64, 48), [1, 2, 8], "EPSG:4326", mean ∘ skipmissing),
+        ("sum", griddims(32, 32), [1, 2], "EPSG:4326", sum),
+    ]
+    s = schemas()
+    for (name, dims, factors, crs, method) in cases
+        expected = JSON.parsefile(joinpath(fixtures, "$name.json"))
+        attrs = PS.multiscales_group_attrs(pyramid_dims(dims, factors; spatial_dims), factors;
+            crs, resampling_method=method, spatial_dims, style=PS.CellCenterStyle())
+        node = group_node(attrs)
+        ours = node["attributes"]
+        @test sort(collect(keys(ours))) == sort(collect(keys(expected)))
+        for key in setdiff(keys(expected), ["multiscales"])
+            @test ours[key] == expected[key]
+        end
+        @test ours["multiscales"]["resampling_method"] == expected["multiscales"]["resampling_method"]
+        @test length(ours["multiscales"]["layout"]) == length(expected["multiscales"]["layout"])
+        for (level, theirs) in zip(ours["multiscales"]["layout"], expected["multiscales"]["layout"])
+            @test level == theirs
+        end
+        # topozarr output is valid under the convention schemas as well
+        for conv in ("multiscales", "proj", "spatial")
+            @test schema_errors(s[conv], node) === nothing
+        end
+    end
+end
+
+@testitem "Styles only differ where expected" setup = [ConventionHelpers] begin
+    using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
+    using Statistics
+
+    levels = pyramid_dims((X(0.0:31.0), Y(0.0:31.0), Ti(1:2)), [1, 2, 8])
+    conv = PS.multiscales_attrs(levels, [1, 2, 8]; resampling_method=mean)
+    cc = PS.multiscales_attrs(levels, [1, 2, 8]; resampling_method=mean, style=PS.CellCenterStyle())
+    @test conv["resampling_method"] == "average"
+    @test cc["resampling_method"] == "mean"
+    @test haskey(conv["layout"][1], "transform")
+    @test !haskey(cc["layout"][1], "transform")
+    @test conv["layout"][3]["transform"]["translation"] == [0.0, 0.0, 0.0]
+    @test cc["layout"][3]["transform"]["translation"] == [0.0, 1.5, 1.5]
+    for (c, t) in zip(conv["layout"], cc["layout"])
+        @test c["spatial:transform"] == t["spatial:transform"]
+        @test c["spatial:shape"] == t["spatial:shape"]
+        @test get(c, "derived_from", nothing) == get(t, "derived_from", nothing)
+        haskey(t, "transform") && @test c["transform"]["scale"] == t["transform"]["scale"]
+    end
+    @test PS.resampling_method_name(PS.CellCenterStyle(), median) == "median"
+    @test PS.resampling_method_name(PS.CellCenterStyle(), maximum) == "max"
 end
