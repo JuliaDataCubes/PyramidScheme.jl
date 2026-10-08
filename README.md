@@ -31,24 +31,45 @@ using GLMakie
 plot(pyr)
 ```
 
-## Preparing the Pyramid for zarr data
-If you want to prepare a pyramid which is saved inside of a Zarr dataset you can use the `buildpyramids` function. The buildpyramids function adds the 
-Here we use the same example data as above, but we first save the data in a zarr file.
+## Writing pyramids to Zarr
+
+`buildpyramids(src, dest)` computes the pyramid levels of `src` and writes them as a multiscale Zarr v3 store at `dest`.
+`src` can be the path of a dataset that YAXArrays can open or any `AbstractDimArray`, and it is not modified.
+The store follows the [multiscales](https://github.com/zarr-conventions/multiscales), [spatial](https://github.com/zarr-conventions/spatial) and [proj](https://github.com/zarr-conventions/proj) conventions:
+the root group only holds the metadata, `src` is copied to the child group `0` and the aggregated levels are written to the groups `1`, `2`, ...
+
+Here we use the same example data as above:
 
 ```julia
 using YAXArrays
 elevpath = getraster(WorldClim{Elevation},:elev, res="30s")
 elev = Cube(elevpath)
-zarrpath = tempname() * ".zarr"
-savecube(elev, zarrpath)
-@time PS.buildpyramids(zarrpath)
+pyrpath = tempname() * ".zarr"
+@time pyr = PS.buildpyramids(elev, pyrpath; resampling_method=mean, crs="EPSG:4326")
 ```
+
+The most important keywords are:
+
+- `nlevels` or `factors`: the levels to build, e.g. `nlevels=3` for factors `[1, 2, 4, 8]` or `factors=[1, 4, 16]`.
+  By default enough levels are built for the coarsest one to fit into 256 by 256 cells.
+- `resampling_method`: the function aggregating the cells of a window, e.g. `mean`, `sum` or `mean ∘ skipmissing`.
+- `edges`: `:keep` (default) turns a partial window at the end of a dimension into its own cell, `:drop` leaves it out.
+- `crs`: the coordinate reference system written to the `proj:` attributes. By default it is taken from the dimensions, e.g. of a Rasters.jl `Raster`.
+- `style`: `ConventionStyle()` (default) writes the `multiscales` metadata as in the examples of the convention,
+  `CellCenterStyle()` measures the translation between levels between cell centers.
+  `style=CellCenterStyle(), edges=:drop` produces the same metadata as [topozarr](https://github.com/carbonplan/topozarr).
+
+An in memory `Pyramid` can be written the same way with `write(dest, pyramid)`.
+
+`Pyramid(path)` opens a multiscale store, written by PyramidScheme or by other tools such as topozarr, as well as stores written by earlier versions of PyramidScheme.
+Remote stores need the corresponding storage package, e.g. `using Zarr` loads all of them.
 
 ### Example above
 
 To reproduce the zooming example shown at the top of the README you can get the Above Ground Biomass here or try to load it from the cloud, but this might have some serious lag.
 ```julia
 using YAXArrays, PyramidScheme
+using Zarr # for reading from http
 using GLMakie
 p2020 = PS.Pyramid("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
 replacenan(nanval) =  data -> <=(nanval)(data) ? NaN32 : Float32(data)
@@ -59,5 +80,5 @@ plot(p2020nan, colormap=:speed, colorscale=sqrt)
 c = Cube("https://s3.bgc-jena.mpg.de:9000/pyramids/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2020-fv4.0.zarr")
 savecube(c, "somepath.zarr")
 # Build the pyramid from this data locally
-buildpyramids("somepath.zarr")
+buildpyramids("somepath.zarr", "pyramid.zarr")
 ```

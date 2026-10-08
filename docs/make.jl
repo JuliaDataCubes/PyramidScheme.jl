@@ -7,6 +7,7 @@ makedocs(
     sitename = "PyramidScheme.jl",
     pages = Any[
             "index.md",
+            "multiscales.md",
             "interface.md",
     ]
     # strict = true,

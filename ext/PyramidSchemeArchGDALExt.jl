@@ -17,13 +17,13 @@ function _pyramid_gdal(path::AbstractString)
         dbase = dims(base,(1,2))
         pyrlevels = AbstractDimArray[]
         for n in 0:numlevels-1
-            levelbands = [YAXArray(PS.agg_axis.(dbase, 2^(n+1)), AG.getoverview(AG.getband(agbase,bind), n)) for bind in bandindices]
+            levelbands = [YAXArray(PS.coarsen_dim.(dbase, 2^(n+1)), AG.getoverview(AG.getband(agbase,bind), n)) for bind in bandindices]
             level = cat(levelbands..., dims=banddim)
             push!(pyrlevels, level)
         end
         pyrlevels
     else 
-        pyrlevels = [YAXArray(PS.agg_axis.(dims(base), 2^(n+1)),AG.getoverview(band, n)) for n in 0:numlevels-1]
+        pyrlevels = [YAXArray(PS.coarsen_dim.(dims(base), 2^(n+1)),AG.getoverview(band, n)) for n in 0:numlevels-1]
     end
     PS.Pyramid(base, pyrlevels, metadata(base))
 end
