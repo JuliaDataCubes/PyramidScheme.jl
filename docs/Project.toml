@@ -12,3 +12,6 @@ YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
 
 [sources]
 PyramidScheme = { path = ".." }
+
+[compat]
+GeometryBasics = "0.5.11"
