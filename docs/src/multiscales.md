@@ -4,6 +4,8 @@ PyramidScheme writes pyramids as Zarr v3 stores that follow the
 [multiscales](https://github.com/zarr-conventions/multiscales),
 [spatial](https://github.com/zarr-conventions/spatial) and
 [proj](https://github.com/zarr-conventions/proj) conventions, version `v0.1`.
+The conventions are defined for Zarr v3 metadata, so pyramids are always written as Zarr v3,
+also when the source is a Zarr v2 dataset.
 These stores can be read by other tools that implement the conventions,
 for example [topozarr](https://github.com/carbonplan/topozarr) and
 [zarr-layer](https://github.com/carbonplan/zarr-layer).
