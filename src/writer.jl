@@ -61,7 +61,7 @@ function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=n
             end
         end
     end
-    consolidated && consolidate_v3(dest)
+    consolidated && ZarrCore.consolidate_metadata(zopen(dest, "w"))
     open_written_pyramid(dest, length(factors), attrs)
 end
 
@@ -93,7 +93,7 @@ function Base.write(dest::AbstractString, pyramid::Pyramid; resampling_method=re
     for (i, level) in enumerate(alllevels)
         write_level(level, levelpath(dest, i - 1), spatial_dims; layername, chunksize, compressor, attrs=levelattrs)
     end
-    consolidated && consolidate_v3(dest)
+    consolidated && ZarrCore.consolidate_metadata(zopen(dest, "w"))
     open_written_pyramid(dest, length(alllevels), attrs)
 end
 
@@ -104,15 +104,6 @@ function recorded_method(pyramid)
 end
 
 levelpath(dest, i) = joinpath(dest, string(i))
-
-# Work around two ZarrCore 0.11.2 issues: consolidate_metadata(::ZGroup) writes v2 metadata
-# (.zmetadata) also for v3 groups, and the v3 method builds child paths as "/name" when the group
-# path is "", which a DirectoryStore resolves to the file system root. Rooting the walk at "."
-# gives "./name", which resolves inside the store and still yields relative keys.
-function consolidate_v3(dest)
-    store, _ = ZarrCore.storefromstring(dest, false)
-    ZarrCore.consolidate_metadata(store, ".", ZarrCore.ZarrFormat(3))
-end
 
 """
     default_crs(a, spatial_dims)

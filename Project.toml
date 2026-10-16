@@ -31,9 +31,11 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 [sources]
 # Unreleased versions needed for Zarr 0.11 / ZarrCore support.
 # Remove before registering, once DiskArrayEngine 0.3.5, YAXArrayBase 0.8 and the matching YAXArrays are released.
+# ZarrCore: consolidating v3 groups, https://github.com/JuliaIO/Zarr.jl/tree/la/consolidate-v3, until it is released.
 DiskArrayEngine = {url = "https://github.com/meggart/DiskArrayEngine.jl", rev = "main"}
 YAXArrayBase = {url = "https://github.com/JuliaDataCubes/YAXArrayBase.jl", rev = "la/zarrcore"}
 YAXArrays = {url = "https://github.com/JuliaDataCubes/YAXArrays.jl", rev = "la/base8"}
+ZarrCore = {url = "https://github.com/JuliaIO/Zarr.jl", rev = "la/consolidate-v3", subdir = "ZarrCore"}
 
 [extensions]
 PyramidSchemeArchGDALExt = "ArchGDAL"
