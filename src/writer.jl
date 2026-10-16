@@ -134,11 +134,11 @@ level_chunks(dims, spatial_dims, chunksize) =
     map(d -> isspatial(dims, d, spatial_dims) ? min(chunksize, length(d)) : 1, dims)
 
 """
-    write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs=Dict())
+    write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs)
 
 Write the array `a` as a Zarr v3 dataset to `path`, with the group attributes `attrs`.
 """
-function write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs=Dict{String,Any}())
+function write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs)
     yax = a isa YAXArray ? a : YAXArray(DD.dims(a), parent(a))
     chunked = setchunks(yax, level_chunks(DD.dims(a), spatial_dims, chunksize))
     ds = to_dataset(chunked; layername)
@@ -147,13 +147,12 @@ function write_level(a, path, spatial_dims; layername, chunksize, compressor, at
 end
 
 """
-    output_zarr(leveldims, t, path, spatial_dims; layername, chunksize, compressor, attrs=Dict())
+    output_zarr(leveldims, t, path, spatial_dims; layername, chunksize, compressor, attrs)
 
 Construct an empty Zarr v3 dataset at `path` for a pyramid level with the dimensions `leveldims`,
 element type `t` and group attributes `attrs`, and return the array of the level.
 """
-function output_zarr(leveldims, t, path, spatial_dims; layername="layer", chunksize=1024,
-    compressor=default_compressor(), attrs=Dict{String,Any}())
+function output_zarr(leveldims, t, path, spatial_dims; layername, chunksize, compressor, attrs)
     yax = YAXArray(leveldims, Zeros(t, length.(leveldims)...))
     chunked = setchunks(yax, level_chunks(leveldims, spatial_dims, chunksize))
     ds = to_dataset(chunked; layername)

@@ -290,17 +290,14 @@ spatial_size(data::DD.AbstractDimArray, spatial_dims) = length.(DD.dims(data, sp
 spatial_size(data, spatial_dims) = size(data)
 
 """
-    gen_output(t,s)
+    gen_output(t, s; path=tempname())
 
-Create output array of type `t` and size `s`
-If the array is smaller than 10e6 it is created on disk and otherwise as a temporary zarr file.
+Create an output array of element type `t` and size `s`.
+Arrays larger than 100 MB are created as a temporary Zarr array at `path`, smaller ones in memory.
 """
 function gen_output(t,s; path=tempname())
-    # This should be dispatching on the output type whether it is internal or external
     outsize = sizeof(t)*prod(s)
     if outsize > 100e6
-        # This should be zgroup instead of zcreate, could use savedataset(skelton=true)
-        # Dummy dataset with FillArrays with the shape of the pyramidlevel
         zcreate(t,s...;path,chunks = (1024,1024),fill_value=zero(t))
     else
         zeros(t,s...)
