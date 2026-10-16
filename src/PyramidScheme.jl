@@ -247,18 +247,15 @@ function fill_pyramids(data, outputs,func,recursive,spatial_dims,factors;runner=
 end
 
 """
-    ESALCMode(counts)
+    ESALCMode()
 
-Struct for more efficient handling of aggregating categorical land cover data.
+Aggregation that returns the most frequent class of categorical `UInt8` data, e.g. land cover.
 """
-struct ESALCMode
-    counts::Vector{Vector{Int}}
-end
-
-ESALCMode() = ESALCMode([zeros(Int,256) for _ in 1:Threads.nthreads()])
+struct ESALCMode end
 
 function (f::ESALCMode)(x)
-    cv = f.counts[Threads.threadid()]
+    # A buffer per task, tasks can move between threads so a buffer per thread is not safe
+    cv = get!(() -> zeros(Int, 256), task_local_storage(), :PyramidScheme_ESALCMode)::Vector{Int}
     fill!(cv,0)
     for ix in x
         cv[Int(ix)+1] += 1
