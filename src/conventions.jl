@@ -228,15 +228,14 @@ function multiscales_attrs(leveldims, factors; resampling_method, recursive=true
     layout = map(enumerate(zip(leveldims, factors))) do (i, (dims, factor))
         source = i == 1 ? nothing : recursive ? i - 1 : 1
         step = source === nothing ? 1 : factor ÷ factors[source]
-        isspatial = map(d -> DD.hasdim(DD.dims(dims, spatial_dims), d), reverse(dims))
         xdim, ydim = DD.dims(dims, spatial_dims)
         level = Dict{String,Any}(
             "asset" => string(i - 1),
             "spatial:transform" => spatial_transform(xdim, ydim; fallback_res=res0 .* factor),
             "spatial:shape" => [length(ydim), length(xdim)],
             "transform" => Dict{String,Any}(
-                "scale" => [s ? Float64(step) : 1.0 for s in isspatial],
-                "translation" => zeros(length(isspatial)),
+                "scale" => [isspatial(dims, d, spatial_dims) ? Float64(step) : 1.0 for d in reverse(dims)],
+                "translation" => zeros(length(dims)),
             ),
         )
         if source !== nothing
