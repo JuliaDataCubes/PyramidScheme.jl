@@ -339,7 +339,7 @@ output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
     SpatialDim
 Union of Dimensions which are assumed to be in space and are therefore used in the pyramid building. 
 """
-SpatialDim = (DD.Dimensions.XDim, DD.Dimensions.YDim)
+const SpatialDim = (XDim, YDim)
 
 """
     getpyramids(reducefunc, ras; recursive=true, tilesize=256, nlevels=nothing, factors=nothing, edges=:keep, spatial_dims=SpatialDim)
