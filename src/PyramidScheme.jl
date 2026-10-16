@@ -295,11 +295,16 @@ e.g. `Union{Missing, Float64}` for `mean` of data with missing values.
 level_eltype(f, T) = Base.infer_return_type(f, (Matrix{T},))
 
 """
-    compute_nlevels(data, tilesize=1024)
+    compute_nlevels(data, tilesize=256; spatial_dims=SpatialDim)
 
-Compute the number of levels for the aggregation based on the size of `data`.
+Compute the number of levels for the coarsest level of `data` to fit into `tilesize`.
+Only the spatial dimensions count, arrays without dimensions use their size.
 """
-compute_nlevels(data, tilesize=256) = max(0,ceil(Int,log2(maximum(size(data))/tilesize)))
+compute_nlevels(data, tilesize=256; spatial_dims=SpatialDim) =
+    max(0, ceil(Int, log2(maximum(spatial_size(data, spatial_dims)) / tilesize)))
+
+spatial_size(data::DD.AbstractDimArray, spatial_dims) = length.(DD.dims(data, spatial_dims))
+spatial_size(data, spatial_dims) = size(data)
 
 """
     gen_output(t,s)
@@ -347,7 +352,7 @@ Without either, enough levels are computed for the coarsest one to fit into `til
 (`:keep`) or left out (`:drop`).
 """
 function getpyramids(reducefunc, ras;recursive=true, tilesize=256, nlevels=nothing, factors=nothing, edges=:keep, spatial_dims=SpatialDim)
-    factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(ras, tilesize))
+    factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(ras, tilesize; spatial_dims))
     if length(factors) == 1
         @info "Array is smaller than the tilesize no pyramidlevels are computed"
         return [], []

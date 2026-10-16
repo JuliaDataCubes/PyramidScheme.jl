@@ -38,7 +38,7 @@ function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=n
     chunksize=1024, compressor=default_compressor(), consolidated=true, overwrite=false, runner=LocalRunner)
     xy = DD.dims(src, spatial_dims)
     length(xy) == 2 || throw(ArgumentError("Expected two spatial dimensions got $xy"))
-    factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(src, tilesize))
+    factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(src, tilesize; spatial_dims))
     leveldims = [level_dims(DD.dims(src), f; edges, spatial_dims) for f in factors]
     crs = crs === :auto ? default_crs(src, spatial_dims) : crs
     attrs = multiscales_group_attrs(leveldims, factors; crs, resampling_method, recursive, spatial_dims)

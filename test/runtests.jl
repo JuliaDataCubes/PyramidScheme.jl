@@ -62,9 +62,13 @@ end
 
 @testitem "Helper functions" begin
     using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
     @test PS.compute_nlevels(zeros(1000)) == 2
     @test PS.compute_nlevels(zeros(1000,1025)) == 3
     @test PS.compute_nlevels(zeros(10000, 8000)) == 6
+    # Only the spatial dimensions count
+    @test PS.compute_nlevels(DimArray(zeros(64, 64, 5000), (X(1:64), Y(1:64), Ti(1:5000)))) == 0
+    @test PS.compute_nlevels(DimArray(zeros(5000, 1024, 3), (X(1:5000), Y(1:1024), Ti(1:3)))) == 5
 end
 
 @testitem "ArchGDAL Loading of Geotiff Overviews" begin
