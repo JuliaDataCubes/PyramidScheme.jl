@@ -45,13 +45,10 @@ function Base.copy(bc::Broadcasted{<:PyramidStyle})
         argslevel = Flatten.reconstruct(args, pyrslevel, Pyramid, Array) 
         func.(argslevel...)
     end
-    #@show typeof(newlevels)
     base = newlevels[1]
     layers = newlevels[2:end]
     Pyramid(base, layers, broadcast_metadata(args))
 end
-
-#function Base.copyto!(pyr::Pyramid, bc::Broadcasted{PyramidStyle}) = pyr
 
 # TODO Implement proper metadata handling for broadcast
 broadcast_metadata(inputs) = Dict()

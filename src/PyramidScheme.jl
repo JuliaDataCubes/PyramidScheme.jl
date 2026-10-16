@@ -74,9 +74,6 @@ function Pyramid(path::AbstractString, backend)
 end
 function _pyramid_gdal end
 
-# refdims
-# name
-
 """
     levels(pyramid::Pyramid)
 Return all levels of the `pyramid`. These are order from the base to the coarsest aggregation.
@@ -103,8 +100,6 @@ function Base.:(==)(pyrA::Pyramid, pyrB::Pyramid)
 end
 
 Base.isequal(pyrA::Pyramid, pyrB::Pyramid) = pyrA == pyrB
-
-#   all(isequal.(reverse(PyramidScheme.levels(pyrA)), reverse(PyramidScheme.levels(pyrB))))
 
 DD.name(pyramid::Pyramid) = DD.name(parent(pyramid))
 DD.refdims(pyramid::Pyramid) = DD.refdims(parent(pyramid))
@@ -273,18 +268,6 @@ function (f::ESALCMode)(x)
 end
 
 
-"""
-    arraywindows(s,w)
-
-Construct a list of `RegularWindows` for the size list in `s` for windows `w`.
-??
-"""
-function arraywindows(s,w)
-    map(s) do l
-        RegularWindows(1,l,window=w)
-    end
-end
-
 
 """
     level_eltype(f, T)
@@ -419,20 +402,6 @@ function switchkeys(dataext, keyext)
     yk = ykey(keyext)
     nt = NamedTuple{(xk, yk)}((dataext.X, dataext.Y))
     Extent(nt)
-end
-
-"""
-    trans_bounds(trans::Proj.Transformation, bbox::Extent, densify_pts::Integer)
-Compute the projection of `bbox` with the transformation `trans`. 
-This is used to project the data on the fly to another transformation.
-"""
-function trans_bounds(
-    trans::Proj.Transformation,
-    bbox::Extent,
-    densify_pts::Integer = 21,
-)::Extent
-    xlims, ylims = Proj.bounds(trans, bbox.X, bbox.Y; densify_pts)
-    return Extent(X = xlims, Y = ylims)
 end
 
 function Base.cat(A1::Pyramid, As::Pyramid...;dims)
