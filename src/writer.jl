@@ -43,16 +43,17 @@ function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=n
     crs = crs === :auto ? default_crs(src, spatial_dims) : crs
     attrs = multiscales_group_attrs(leveldims, factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(src)
+    levelattrs = level_group_attrs(crs)
 
     create_multiscales_group(dest, attrs; overwrite)
-    write_level(src, levelpath(dest, 0), spatial_dims; layername, chunksize, compressor)
+    write_level(src, levelpath(dest, 0), spatial_dims; layername, chunksize, compressor, attrs=levelattrs)
     if length(factors) > 1
         t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(src))},))
         # The levels are computed with partial windows and trimmed for edges=:drop,
         # the trimmed cells do not contribute to coarser levels.
         keepdims = [level_dims(DD.dims(src), f; edges=:keep, spatial_dims) for f in factors[2:end]]
-        outarrs = [output_zarr(d, t, levelpath(dest, i), spatial_dims; layername, chunksize, compressor)
-                   for (i, d) in enumerate(keepdims)]
+        outarrs = [output_zarr(d, t, levelpath(dest, i), spatial_dims; layername, chunksize, compressor,
+                       attrs=levelattrs) for (i, d) in enumerate(keepdims)]
         fill_pyramids(src, outarrs, resampling_method, recursive, DD.dimnum(DD.dims(src), spatial_dims), factors; runner)
         if edges === :drop
             for i in 1:length(factors)-1
@@ -86,10 +87,11 @@ function Base.write(dest::AbstractString, pyramid::Pyramid; resampling_method=re
     crs = crs === :auto ? default_crs(base, spatial_dims) : crs
     attrs = multiscales_group_attrs(DD.dims.(alllevels), factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(base)
+    levelattrs = level_group_attrs(crs)
 
     create_multiscales_group(dest, attrs; overwrite)
     for (i, level) in enumerate(alllevels)
-        write_level(level, levelpath(dest, i - 1), spatial_dims; layername, chunksize, compressor)
+        write_level(level, levelpath(dest, i - 1), spatial_dims; layername, chunksize, compressor, attrs=levelattrs)
     end
     consolidated && consolidate_v3(dest)
     open_written_pyramid(dest, length(alllevels), attrs)
@@ -144,27 +146,30 @@ level_chunks(dims, spatial_dims, chunksize) =
     map(d -> isspatial(dims, d, spatial_dims) ? min(chunksize, length(d)) : 1, dims)
 
 """
-    write_level(a, path, spatial_dims; layername, chunksize, compressor)
+    write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs=Dict())
 
-Write the array `a` as a Zarr v3 dataset to `path`.
+Write the array `a` as a Zarr v3 dataset to `path`, with the group attributes `attrs`.
 """
-function write_level(a, path, spatial_dims; layername, chunksize, compressor)
+function write_level(a, path, spatial_dims; layername, chunksize, compressor, attrs=Dict{String,Any}())
     yax = a isa YAXArray ? a : YAXArray(DD.dims(a), parent(a))
     chunked = setchunks(yax, level_chunks(DD.dims(a), spatial_dims, chunksize))
-    savecube(chunked, path; layername, driver=:zarr, zarr_format=3, compressor)
+    ds = to_dataset(chunked; layername)
+    merge!(ds.properties, attrs)
+    savedataset(ds; path, driver=:zarr, zarr_format=3, compressor)
 end
 
 """
-    output_zarr(leveldims, t, path, spatial_dims; layername, chunksize, compressor)
+    output_zarr(leveldims, t, path, spatial_dims; layername, chunksize, compressor, attrs=Dict())
 
-Construct an empty Zarr v3 dataset at `path` for a pyramid level with the dimensions `leveldims`
-and element type `t` and return the array of the level.
+Construct an empty Zarr v3 dataset at `path` for a pyramid level with the dimensions `leveldims`,
+element type `t` and group attributes `attrs`, and return the array of the level.
 """
 function output_zarr(leveldims, t, path, spatial_dims; layername="layer", chunksize=1024,
-    compressor=default_compressor())
+    compressor=default_compressor(), attrs=Dict{String,Any}())
     yax = YAXArray(leveldims, Zeros(t, length.(leveldims)...))
     chunked = setchunks(yax, level_chunks(leveldims, spatial_dims, chunksize))
     ds = to_dataset(chunked; layername)
+    merge!(ds.properties, attrs)
     dssaved = savedataset(ds; path, skeleton=true, driver=:zarr, zarr_format=3, compressor)
     dssaved.cubes[Symbol(layername)].data
 end

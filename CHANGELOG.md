@@ -36,6 +36,7 @@ Changelog.generate(
 - `nlevels` and `factors` keywords to choose the levels, e.g. `factors=[1, 4, 16]`.
 - `edges=:drop` to leave out partial windows at the end of a dimension instead of keeping them as a cell.
 - `crs` keyword for the `proj:` attributes, taken from the dimensions by default.
+  They are written to the root group and to every level group.
 - `write(dest, pyramid)` to write an in memory pyramid.
 - `Pyramid(path)` reads stores with a multiscales layout, including stores written by topozarr.
   Stores written by earlier versions can still be read.

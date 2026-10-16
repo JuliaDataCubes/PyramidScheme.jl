@@ -36,6 +36,9 @@
         group = JSON.parsefile(joinpath(dest, level, "zarr.json"))
         @test group["zarr_format"] == 3
         @test group["node_type"] == "group"
+        # The proj convention applies to direct children, so every level group has the CRS
+        @test group["attributes"] == group_node(PS.level_group_attrs("EPSG:4326"))["attributes"]
+        @test schema_errors(s["proj"], group) === nothing
         for name in ("layer", "X", "Y")
             array = JSON.parsefile(joinpath(dest, level, name, "zarr.json"))
             @test array["zarr_format"] == 3
@@ -78,6 +81,12 @@ end
     foreach(l -> l["resampling_method"] = "average", ms["layout"][2:end])
     ms["layout"][1]["transform"] = Dict("scale" => [1.0, 1.0], "translation" => [0.0, 0.0])
     @test JSON.parsefile(joinpath(dest, "zarr.json"))["attributes"] == expected
+    # The level groups have the proj attributes of the level groups written by topozarr
+    theirs = JSON.parsefile(joinpath(@__DIR__, "fixtures", "topozarr", "store.zarr", "0", "zarr.json"))["attributes"]
+    for level in ("0", "1", "2")
+        ours = JSON.parsefile(joinpath(dest, level, "zarr.json"))["attributes"]
+        @test Dict(ours) == Dict(k => theirs[k] for k in ("zarr_conventions", "proj:code", "proj:wkt2"))
+    end
     @test [size(parent(pyr)); size.(pyr.levels)] == [(50, 30), (25, 15), (12, 7)]
     @test JSON.parsefile(joinpath(dest, "2", "x", "zarr.json"))["shape"] == [12]
     @test JSON.parsefile(joinpath(dest, "2", "y", "zarr.json"))["shape"] == [7]
@@ -115,11 +124,17 @@ end
     attrs = JSON.parsefile(joinpath(dest, "zarr.json"))["attributes"]
     @test attrs["proj:code"] == "EPSG:32633"
     @test "proj" in [c["name"] for c in attrs["zarr_conventions"]]
+    for level in ("0", "1")
+        @test JSON.parsefile(joinpath(dest, level, "zarr.json"))["attributes"]["proj:code"] == "EPSG:32633"
+    end
 
     buildpyramids(ras, dest; factors=[1, 2], crs=nothing, overwrite=true)
     attrs = JSON.parsefile(joinpath(dest, "zarr.json"))["attributes"]
     @test !any(startswith("proj:"), keys(attrs))
     @test [c["name"] for c in attrs["zarr_conventions"]] == ["multiscales", "spatial"]
+    for level in ("0", "1")
+        @test isempty(get(JSON.parsefile(joinpath(dest, level, "zarr.json")), "attributes", Dict()))
+    end
 end
 
 @testitem "Multiscales store with an extra dimension" setup = [ConventionHelpers] begin
@@ -160,6 +175,7 @@ end
     end
     for l in 0:2
         @test Array(parent(PS.levels(pyr, l))) ≈ parent(PS.levels(pyrmem, l))
+        @test JSON.parsefile(joinpath(dest, string(l), "zarr.json"))["attributes"]["proj:code"] == "EPSG:4326"
     end
     @test_throws ArgumentError write(tempname() * ".zarr", Pyramid(src, pyrmem.levels, Dict()))
 end

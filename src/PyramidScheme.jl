@@ -11,7 +11,7 @@ using DiskArrayEngine: DiskArrayEngine, GMDWop, InputArray, LocalRunner, Regular
 using DiskArrayEngine: create_outwindows, engine
 using DiskArrays: DiskArrays
 using YAXArrayBase: YAXArrayBase as YAB
-using YAXArrays: Cube, YAXArray, to_dataset, savedataset, savecube, setchunks, open_dataset
+using YAXArrays: Cube, YAXArray, to_dataset, savedataset, setchunks, open_dataset
 using ZarrCore: ZarrCore, zcreate, zopen, zgroup
 using ZarrZstd: ZarrZstd
 # Loaded so that Blosc compressed stores, e.g. older pyramids, can be read

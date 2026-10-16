@@ -87,6 +87,10 @@ By default (`crs=:auto`) the CRS is taken from the lookups of the spatial dimens
 `Raster` from Rasters.jl. It can be given explicitly with `crs`, as anything `Proj.CRS` accepts,
 e.g. `"EPSG:4326"` or a WKT string. With `crs=nothing` no `proj:` attributes are written.
 
+The `proj:` attributes are written to the root group and to every level group, because the proj
+convention applies to the direct children of a group. The arrays of a level, opened on their own,
+then have the CRS as well.
+
 ## Reading a store
 
 `Pyramid(path)` opens a multiscale store. The base and the order of the levels are taken from the
