@@ -55,9 +55,6 @@ The most important keywords are:
 - `resampling_method`: the function aggregating the cells of a window, e.g. `mean`, `sum` or `mean ∘ skipmissing`.
 - `edges`: `:keep` (default) turns a partial window at the end of a dimension into its own cell, `:drop` leaves it out.
 - `crs`: the coordinate reference system written to the `proj:` attributes. By default it is taken from the dimensions, e.g. of a Rasters.jl `Raster`.
-- `style`: `ConventionStyle()` (default) writes the `multiscales` metadata as in the examples of the convention,
-  `CellCenterStyle()` measures the translation between levels between cell centers.
-  `style=CellCenterStyle(), edges=:drop` produces the same metadata as [topozarr](https://github.com/carbonplan/topozarr).
 
 An in memory `Pyramid` can be written the same way with `write(dest, pyramid)`.
 

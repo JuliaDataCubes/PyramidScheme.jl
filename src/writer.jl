@@ -6,8 +6,8 @@ default_compressor() = ZarrZstd.ZstdCompressor()
 
 """
     buildpyramids(src, dest; nlevels=nothing, factors=nothing, resampling_method=mean, recursive=true,
-                  edges=:keep, style=ConventionStyle(), crs=:auto, spatial_dims=SpatialDim, tilesize=256,
-                  chunksize=1024, compressor=ZstdCompressor(), consolidated=true, overwrite=false, runner=LocalRunner)
+                  edges=:keep, crs=:auto, spatial_dims=SpatialDim, tilesize=256, chunksize=1024,
+                  compressor=ZstdCompressor(), consolidated=true, overwrite=false, runner=LocalRunner)
 
 Build a multiscale Zarr v3 store at `dest` from `src` and return it as a [`Pyramid`](@ref).
 `src` is the path of a dataset that YAXArrays can open, or an `AbstractDimArray`. It is not modified.
@@ -22,8 +22,6 @@ group `0` and the aggregated levels are written to the groups `1`, `2`, ...
 - `resampling_method`: function aggregating a window of cells, e.g. `mean`, `sum` or `mean ∘ skipmissing`.
 - `recursive`: compute every level from the previous one instead of from `src`.
 - `edges`: `:keep` turns partial windows at the end of a dimension into a cell, `:drop` leaves them out.
-- `style`: how the `multiscales` metadata is written, see [`MultiscalesStyle`](@ref).
-  `style=CellCenterStyle(), edges=:drop` writes the same metadata as topozarr.
 - `crs`: the coordinate reference system written to the `proj:` attributes, anything `Proj.CRS` accepts.
   `:auto` takes it from the lookups of the spatial dimensions if they have one,
   `nothing` writes no `proj:` attributes.
@@ -36,15 +34,14 @@ group `0` and the aggregated levels are written to the groups `1`, `2`, ...
 buildpyramids(src::AbstractString, dest::AbstractString; kwargs...) = buildpyramids(Cube(src), dest; kwargs...)
 
 function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=nothing, factors=nothing,
-    resampling_method=mean, recursive=true, edges=:keep, style::MultiscalesStyle=ConventionStyle(),
-    crs=:auto, spatial_dims=SpatialDim, tilesize=256, chunksize=1024, compressor=default_compressor(),
-    consolidated=true, overwrite=false, runner=LocalRunner)
+    resampling_method=mean, recursive=true, edges=:keep, crs=:auto, spatial_dims=SpatialDim, tilesize=256,
+    chunksize=1024, compressor=default_compressor(), consolidated=true, overwrite=false, runner=LocalRunner)
     xy = DD.dims(src, spatial_dims)
     length(xy) == 2 || throw(ArgumentError("Expected two spatial dimensions got $xy"))
     factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(src, tilesize))
     leveldims = [level_dims(DD.dims(src), f; edges, spatial_dims) for f in factors]
     crs = crs === :auto ? default_crs(src, spatial_dims) : crs
-    attrs = multiscales_group_attrs(leveldims, factors; crs, resampling_method, recursive, spatial_dims, style)
+    attrs = multiscales_group_attrs(leveldims, factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(src)
 
     create_multiscales_group(dest, attrs; overwrite)
@@ -73,22 +70,21 @@ buildpyramids(path::AbstractString; kwargs...) = throw(ArgumentError("""
     Use `buildpyramids(src, dest)` to write the pyramid to a new store at `dest`."""))
 
 """
-    write(dest, pyramid::Pyramid; resampling_method, recursive=true, style=ConventionStyle(), crs=:auto,
+    write(dest, pyramid::Pyramid; resampling_method, recursive=true, crs=:auto,
           spatial_dims=SpatialDim, chunksize=1024, compressor=ZstdCompressor(), consolidated=true, overwrite=false)
 
 Write `pyramid` to a multiscale Zarr v3 store at `dest`, see [`buildpyramids`](@ref) for the layout
 and the keywords. `resampling_method` defaults to the method recorded in the metadata of `pyramid`.
 """
 function Base.write(dest::AbstractString, pyramid::Pyramid; resampling_method=recorded_method(pyramid),
-    recursive=true, style::MultiscalesStyle=ConventionStyle(), crs=:auto, spatial_dims=SpatialDim,
-    chunksize=1024, compressor=default_compressor(), consolidated=true, overwrite=false)
+    recursive=true, crs=:auto, spatial_dims=SpatialDim, chunksize=1024, compressor=default_compressor(),
+    consolidated=true, overwrite=false)
     base = parent(pyramid)
     alllevels = [base, pyramid.levels...]
     xbase = DD.dims(base, first(spatial_dims))
     factors = [level_factor(xbase, DD.dims(l, first(spatial_dims))) for l in alllevels]
     crs = crs === :auto ? default_crs(base, spatial_dims) : crs
-    attrs = multiscales_group_attrs(DD.dims.(alllevels), factors; crs, resampling_method, recursive,
-        spatial_dims, style)
+    attrs = multiscales_group_attrs(DD.dims.(alllevels), factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(base)
 
     create_multiscales_group(dest, attrs; overwrite)
@@ -107,7 +103,7 @@ end
 
 levelpath(dest, i) = joinpath(dest, string(i))
 
-# Work around two ZarrCore 0.11.1 issues: consolidate_metadata(::ZGroup) writes v2 metadata
+# Work around two ZarrCore 0.11.2 issues: consolidate_metadata(::ZGroup) writes v2 metadata
 # (.zmetadata) also for v3 groups, and the v3 method builds child paths as "/name" when the group
 # path is "", which a DirectoryStore resolves to the file system root. Rooting the walk at "."
 # gives "./name", which resolves inside the store and still yields relative keys.

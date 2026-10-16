@@ -35,8 +35,6 @@ Changelog.generate(
 
 - `nlevels` and `factors` keywords to choose the levels, e.g. `factors=[1, 4, 16]`.
 - `edges=:drop` to leave out partial windows at the end of a dimension instead of keeping them as a cell.
-- `ConventionStyle` and `CellCenterStyle` to choose how the `multiscales` metadata is written.
-  `style=CellCenterStyle(), edges=:drop` writes the same metadata as topozarr.
 - `crs` keyword for the `proj:` attributes, taken from the dimensions by default.
 - `write(dest, pyramid)` to write an in memory pyramid.
 - `Pyramid(path)` reads stores with a multiscales layout, including stores written by topozarr.

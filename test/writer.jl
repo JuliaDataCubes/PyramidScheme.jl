@@ -60,7 +60,7 @@
     end
 end
 
-@testitem "Dropped edges in cell center style match topozarr" begin
+@testitem "Dropped edges match topozarr" begin
     using PyramidScheme: PyramidScheme as PS
     using YAXArrays
     using DimensionalData
@@ -69,9 +69,14 @@ end
     # Same grid as the odd_size case of fixtures/topozarr/generate.py
     src = YAXArray((Dim{:x}(0.0:49.0), Dim{:y}(29.0:-1.0:0.0)), rand(Float32, 50, 30))
     dest = tempname() * ".zarr"
-    pyr = buildpyramids(src, dest; factors=[1, 2, 4], edges=:drop, style=CellCenterStyle(),
+    pyr = buildpyramids(src, dest; factors=[1, 2, 4], edges=:drop,
         crs="EPSG:4326", spatial_dims=(Dim{:x}, Dim{:y}))
     expected = JSON.parsefile(joinpath(@__DIR__, "fixtures", "topozarr", "odd_size.json"))
+    # topozarr names mean "mean" instead of "average" and leaves out the transform of level 0
+    ms = expected["multiscales"]
+    ms["resampling_method"] = "average"
+    foreach(l -> l["resampling_method"] = "average", ms["layout"][2:end])
+    ms["layout"][1]["transform"] = Dict("scale" => [1.0, 1.0], "translation" => [0.0, 0.0])
     @test JSON.parsefile(joinpath(dest, "zarr.json"))["attributes"] == expected
     @test [size(parent(pyr)); size.(pyr.levels)] == [(50, 30), (25, 15), (12, 7)]
     @test JSON.parsefile(joinpath(dest, "2", "x", "zarr.json"))["shape"] == [12]

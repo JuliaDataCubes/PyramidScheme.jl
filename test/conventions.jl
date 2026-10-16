@@ -234,7 +234,7 @@ end
     end
 end
 
-@testitem "CellCenterStyle matches topozarr" setup = [ConventionHelpers] begin
+@testitem "Agrees with topozarr" setup = [ConventionHelpers] begin
     using PyramidScheme: PyramidScheme as PS
     using DimensionalData
     using JSON
@@ -262,16 +262,27 @@ end
         # topozarr drops partial windows at the edges
         leveldims = [PS.level_dims(dims, f; edges=:drop, spatial_dims) for f in factors]
         attrs = PS.multiscales_group_attrs(leveldims, factors;
-            crs, resampling_method=method, spatial_dims, style=PS.CellCenterStyle())
+            crs, resampling_method=method, spatial_dims)
         node = group_node(attrs)
         ours = node["attributes"]
         @test sort(collect(keys(ours))) == sort(collect(keys(expected)))
         for key in setdiff(keys(expected), ["multiscales"])
             @test ours[key] == expected[key]
         end
-        @test ours["multiscales"]["resampling_method"] == expected["multiscales"]["resampling_method"]
+        # topozarr names mean "mean" instead of "average" and leaves out the transform of level 0
+        method_name(theirs) = get(Dict("mean" => "average"), theirs, theirs)
+        @test ours["multiscales"]["resampling_method"] == method_name(expected["multiscales"]["resampling_method"])
         @test length(ours["multiscales"]["layout"]) == length(expected["multiscales"]["layout"])
-        for (level, theirs) in zip(ours["multiscales"]["layout"], expected["multiscales"]["layout"])
+        for (i, (level, theirs)) in enumerate(zip(ours["multiscales"]["layout"], expected["multiscales"]["layout"]))
+            level, theirs = Dict{String,Any}(level), Dict{String,Any}(theirs)
+            if i == 1
+                transform = pop!(level, "transform")
+                @test transform["scale"] == ones(length(dims))
+                @test transform["translation"] == zeros(length(dims))
+            else
+                @test level["resampling_method"] == method_name(theirs["resampling_method"])
+                level["resampling_method"] = theirs["resampling_method"]
+            end
             @test level == theirs
         end
         # topozarr output is valid under the convention schemas as well
@@ -279,28 +290,4 @@ end
             @test schema_errors(s[conv], node) === nothing
         end
     end
-end
-
-@testitem "Styles only differ where expected" setup = [ConventionHelpers] begin
-    using PyramidScheme: PyramidScheme as PS
-    using DimensionalData
-    using Statistics
-
-    levels = pyramid_dims((X(0.0:31.0), Y(0.0:31.0), Ti(1:2)), [1, 2, 8])
-    conv = PS.multiscales_attrs(levels, [1, 2, 8]; resampling_method=mean)
-    cc = PS.multiscales_attrs(levels, [1, 2, 8]; resampling_method=mean, style=PS.CellCenterStyle())
-    @test conv["resampling_method"] == "average"
-    @test cc["resampling_method"] == "mean"
-    @test haskey(conv["layout"][1], "transform")
-    @test !haskey(cc["layout"][1], "transform")
-    @test conv["layout"][3]["transform"]["translation"] == [0.0, 0.0, 0.0]
-    @test cc["layout"][3]["transform"]["translation"] == [0.0, 1.5, 1.5]
-    for (c, t) in zip(conv["layout"], cc["layout"])
-        @test c["spatial:transform"] == t["spatial:transform"]
-        @test c["spatial:shape"] == t["spatial:shape"]
-        @test get(c, "derived_from", nothing) == get(t, "derived_from", nothing)
-        haskey(t, "transform") && @test c["transform"]["scale"] == t["transform"]["scale"]
-    end
-    @test PS.resampling_method_name(PS.CellCenterStyle(), median) == "median"
-    @test PS.resampling_method_name(PS.CellCenterStyle(), maximum) == "max"
 end

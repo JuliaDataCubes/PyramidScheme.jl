@@ -71,18 +71,15 @@ When the length of a spatial dimension is not a multiple of the factor, the last
 Every level starts at the same corner as the base and has cells that are `factor` times larger,
 so the coordinates of the levels lie exactly on their grid.
 
-## Metadata styles
+## Multiscales metadata
 
-The conventions leave some room for interpretation, so the `multiscales` metadata can be written in
-two styles:
+The `multiscales` metadata follows the README and examples of the convention: every level has a
+`transform` whose `translation` is zero, because all levels start at the same corner, level 0 has the
+identity transform, and resampling methods use the names listed by the convention, e.g. `"average"`
+for `mean`.
 
-| | `ConventionStyle()` (default) | `CellCenterStyle()` |
-|---|---|---|
-| `translation` between levels | `0`, as in the examples of the convention | `(step - 1) / 2`, measured between cell centers |
-| `transform` of the base level | identity | left out |
-| name of `mean` | `"average"` | `"mean"` |
-
-`style=CellCenterStyle(), edges=:drop` writes the same metadata as topozarr.
+With `edges=:drop` the metadata matches the one written by topozarr 0.2.0, except that topozarr
+leaves out the `transform` of level 0 and names `mean` `"mean"`.
 
 ## Coordinate reference system
 
@@ -105,8 +102,5 @@ Reading from remote stores needs the corresponding storage package, e.g. `using 
 ```@docs
 buildpyramids
 Base.write(::AbstractString, ::PyramidScheme.Pyramid)
-PyramidScheme.MultiscalesStyle
-ConventionStyle
-CellCenterStyle
 PyramidScheme.pyramid_factors
 ```

@@ -4,9 +4,9 @@
     using DimensionalData
 
     src = YAXArray((X(0.0:49.0), Y(29.0:-1.0:0.0)), rand(Float32, 50, 30))
-    for (factors, edges, style) in (([1, 2, 4], :keep, ConventionStyle()), ([1, 2, 8], :drop, CellCenterStyle()))
+    for (factors, edges) in (([1, 2, 4], :keep), ([1, 2, 8], :drop))
         dest = tempname() * ".zarr"
-        pyr = buildpyramids(src, dest; factors, edges, style, crs="EPSG:4326")
+        pyr = buildpyramids(src, dest; factors, edges, crs="EPSG:4326")
         disk = Pyramid(dest)
         @test disk isa Pyramid
         @test disk == pyr
@@ -78,19 +78,22 @@ end
     using DimensionalData
     using Statistics
 
-    # Sharded arrays, xarray coordinates and a scalar spatial_ref array without dimension_names
-    path = joinpath(@__DIR__, "fixtures", "topozarr", "store.zarr")
-    pyr = Pyramid(path)
-    @test pyr isa Pyramid
-    @test size(parent(pyr)) == (32, 32)
-    @test size.(pyr.levels) == [(16, 16)]
-    @test name.(dims(parent(pyr))) == (:x, :y)
-    base, level = Array(parent(parent(pyr))), Array(parent(pyr.levels[1]))
-    # Values written by generate.py: v[y, x] = 32 * y + x, zero based
-    @test base[3, 2] == 32 + 2
-    @test all(level[i, j] ≈ mean(base[2i-1:2i, 2j-1:2j]) for i in 1:16, j in 1:16)
-    @test collect(lookup(pyr.levels[1], Dim{:x}))[1:2] == [0.5, 2.5]
-    @test metadata(pyr)["proj:code"] == "EPSG:4326"
+    # Sharded arrays, xarray coordinates and a scalar spatial_ref array without dimension_names.
+    # topozarr 0.1.9 measured the translation between levels between cell centers, 0.2.0 writes zero.
+    for store in ("store.zarr", "store-0.1.9.zarr")
+        path = joinpath(@__DIR__, "fixtures", "topozarr", store)
+        pyr = Pyramid(path)
+        @test pyr isa Pyramid
+        @test size(parent(pyr)) == (32, 32)
+        @test size.(pyr.levels) == [(16, 16)]
+        @test name.(dims(parent(pyr))) == (:x, :y)
+        base, level = Array(parent(parent(pyr))), Array(parent(pyr.levels[1]))
+        # Values written by generate.py: v[y, x] = 32 * y + x, zero based
+        @test base[3, 2] == 32 + 2
+        @test all(level[i, j] ≈ mean(base[2i-1:2i, 2j-1:2j]) for i in 1:16, j in 1:16)
+        @test collect(lookup(pyr.levels[1], Dim{:x}))[1:2] == [0.5, 2.5]
+        @test metadata(pyr)["proj:code"] == "EPSG:4326"
+    end
 end
 
 @testitem "Select levels with arbitrary factors" begin

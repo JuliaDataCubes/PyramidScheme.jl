@@ -25,7 +25,7 @@ using OffsetArrays: OffsetArray
 
 using Statistics: mean, median
 
-export Pyramid, buildpyramids, ConventionStyle, CellCenterStyle
+export Pyramid, buildpyramids
 
 """
     Pyramid

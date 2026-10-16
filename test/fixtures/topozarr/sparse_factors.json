@@ -73,8 +73,8 @@
       2.0
      ],
      "translation": [
-      0.5,
-      0.5
+      0.0,
+      0.0
      ]
     },
     "resampling_method": "mean",
@@ -100,8 +100,8 @@
       4.0
      ],
      "translation": [
-      1.5,
-      1.5
+      0.0,
+      0.0
      ]
     },
     "resampling_method": "mean",
