@@ -329,11 +329,19 @@ function DiskArrayEngine.engine(dimarr::DD.AbstractDimArray)
 end
 DiskArrayEngine.engine(pyr::Pyramid) = Pyramid(engine(parent(pyr)), engine.(pyr.levels), DD.metadata(pyr))
 """
-    output_arrays(pyramid_sizes)
+    compute_levels(alloc, src, factors, f; recursive, spatial_dims, kwargs...)
 
-Create the output arrays for the given `pyramid_sizes`
+Aggregate the levels of `src` downsampled by `factors[2:end]` with `f` and return them.
+The output array of level `i` is created by `alloc(i, dims, T)` with the dimensions `dims` of the level
+with partial windows kept and the element type `T`. The other keywords are passed to [`fill_pyramids`](@ref).
 """
-output_arrays(pyramid_sizes, T) = [gen_output(T,p) for p in pyramid_sizes]
+function compute_levels(alloc, src, factors, f; recursive, spatial_dims, kwargs...)
+    t = level_eltype(f, eltype(src))
+    keepdims = [level_dims(DD.dims(src), fac; edges=:keep, spatial_dims) for fac in factors[2:end]]
+    outputs = [alloc(i, d, t) for (i, d) in enumerate(keepdims)]
+    fill_pyramids(src, outputs, f, recursive, DD.dimnum(DD.dims(src), spatial_dims), factors; kwargs...)
+    outputs
+end
 
 """
     SpatialDim
@@ -360,13 +368,8 @@ function getpyramids(reducefunc, ras;recursive=true, tilesize=256, nlevels=nothi
     pyramid_axes = [level_dims(DD.dims(ras), f; edges, spatial_dims) for f in factors[2:end]]
     # Levels are computed with partial windows and trimmed afterwards,
     # the cells of partial windows do not contribute to coarser levels inside the trimmed sizes.
-    keep_sizes = [length.(level_dims(DD.dims(ras), f; edges=:keep, spatial_dims)) for f in factors[2:end]]
-    outtype = level_eltype(reducefunc, eltype(ras))
-    outmin = output_arrays(keep_sizes, outtype)
-    ispatial_dims = DD.dimnum(DD.dims(ras),spatial_dims)
-
-    fill_pyramids(ras,outmin,reducefunc,recursive, ispatial_dims, factors; threaded=true)
-
+    outmin = compute_levels((_, d, t) -> gen_output(t, length.(d)), ras, factors, reducefunc;
+        recursive, spatial_dims, threaded=true)
     leveldata = map(outmin, pyramid_axes) do out, axes
         size(out) == length.(axes) ? out : view(out, Base.OneTo.(length.(axes))...)
     end
