@@ -51,7 +51,7 @@ function Base.copy(bc::Broadcasted{<:PyramidStyle})
 end
 
 # TODO Implement proper metadata handling for broadcast
-broadcast_metadata(inputs) = Dict()
+broadcast_metadata(inputs) = Dict{String,Any}()
 
 function checklevelcompat(inputs)
     levfirstpyr = nlevels(first(inputs))
