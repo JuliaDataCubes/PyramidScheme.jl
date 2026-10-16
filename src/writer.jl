@@ -80,8 +80,7 @@ function Base.write(dest::AbstractString, pyramid::Pyramid; resampling_method=re
     consolidated=true, overwrite=false)
     base = parent(pyramid)
     alllevels = [base, pyramid.levels...]
-    xbase = DD.dims(base, first(spatial_dims))
-    factors = [level_factor(xbase, DD.dims(l, first(spatial_dims))) for l in alllevels]
+    factors = level_factors(pyramid; spatial_dims)
     crs = crs === :auto ? default_crs(base, spatial_dims) : crs
     attrs = multiscales_group_attrs(DD.dims.(alllevels), factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(base)
