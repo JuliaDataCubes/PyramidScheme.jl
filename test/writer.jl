@@ -37,7 +37,7 @@
         @test group["zarr_format"] == 3
         @test group["node_type"] == "group"
         # The proj convention applies to direct children, so every level group has the CRS
-        @test group["attributes"] == group_node(PS.level_group_attrs("EPSG:4326"))["attributes"]
+        @test group["attributes"] == group_node(PS.level_group_attrs(expected))["attributes"]
         @test schema_errors(s["proj"], group) === nothing
         for name in ("layer", "X", "Y")
             array = JSON.parsefile(joinpath(dest, level, name, "zarr.json"))

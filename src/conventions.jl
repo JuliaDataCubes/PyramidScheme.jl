@@ -268,16 +268,15 @@ function multiscales_group_attrs(leveldims, factors; crs=nothing, resampling_met
 end
 
 """
-    level_group_attrs(crs)
+    level_group_attrs(rootattrs)
 
-Return the attributes of the group of a level: the `proj:` attributes of `crs` and their
-`zarr_conventions` entry, or no attributes when `crs` is `nothing`.
+Return the attributes of the group of a level: the `proj:` attributes of the root group attributes
+`rootattrs` and their `zarr_conventions` entry, or no attributes when the root has no CRS.
 The proj convention applies to the direct children of a group, so every level group carries them
 for its arrays to have the CRS.
 """
-function level_group_attrs(crs)
-    attrs = Dict{String,Any}()
-    crs === nothing && return attrs
-    attrs["zarr_conventions"] = [convention_attrs(PROJ_CONVENTION)]
-    merge!(attrs, proj_attrs(crs))
+function level_group_attrs(rootattrs)
+    attrs = Dict{String,Any}(k => v for (k, v) in rootattrs if startswith(k, "proj:"))
+    isempty(attrs) || (attrs["zarr_conventions"] = [convention_attrs(PROJ_CONVENTION)])
+    attrs
 end

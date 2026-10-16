@@ -43,7 +43,7 @@ function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=n
     crs = crs === :auto ? default_crs(src, spatial_dims) : crs
     attrs = multiscales_group_attrs(leveldims, factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(src)
-    levelattrs = level_group_attrs(crs)
+    levelattrs = level_group_attrs(attrs)
 
     create_multiscales_group(dest, attrs; overwrite)
     write_level(src, levelpath(dest, 0), spatial_dims; layername, chunksize, compressor, attrs=levelattrs)
@@ -87,7 +87,7 @@ function Base.write(dest::AbstractString, pyramid::Pyramid; resampling_method=re
     crs = crs === :auto ? default_crs(base, spatial_dims) : crs
     attrs = multiscales_group_attrs(DD.dims.(alllevels), factors; crs, resampling_method, recursive, spatial_dims)
     layername = layer_name(base)
-    levelattrs = level_group_attrs(crs)
+    levelattrs = level_group_attrs(attrs)
 
     create_multiscales_group(dest, attrs; overwrite)
     for (i, level) in enumerate(alllevels)
