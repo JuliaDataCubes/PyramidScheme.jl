@@ -94,6 +94,20 @@ end
         spatial_dims=(Dim{:x}, Dim{:y})).levels[2])
 end
 
+@testitem "Missing values in the source" begin
+    using PyramidScheme: PyramidScheme as PS
+    using DimensionalData
+    using Statistics
+
+    data = Union{Missing,Float64}[i == 1 && j == 1 ? missing : float(i + j) for i in 1:16, j in 1:16]
+    src = DimArray(data, (X(1.0:16.0), Y(1.0:16.0)))
+    for method in (mean, mean ∘ skipmissing)
+        pyr = buildpyramids(src, tempname() * ".zarr"; factors=[1, 2], resampling_method=method)
+        mem = Pyramid(src; factors=[1, 2], resampling_method=method)
+        @test isequal(Array(parent(pyr.levels[1])), parent(mem.levels[1]))
+    end
+end
+
 @testitem "The source is not modified" begin
     using YAXArrays
     using DimensionalData

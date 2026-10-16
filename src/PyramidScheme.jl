@@ -287,6 +287,14 @@ end
 
 
 """
+    level_eltype(f, T)
+
+Return the element type of the levels aggregated with `f` from data with element type `T`,
+e.g. `Union{Missing, Float64}` for `mean` of data with missing values.
+"""
+level_eltype(f, T) = Base.infer_return_type(f, (Matrix{T},))
+
+"""
     compute_nlevels(data, tilesize=1024)
 
 Compute the number of levels for the aggregation based on the size of `data`.
@@ -348,8 +356,7 @@ function getpyramids(reducefunc, ras;recursive=true, tilesize=256, nlevels=nothi
     # Levels are computed with partial windows and trimmed afterwards,
     # the cells of partial windows do not contribute to coarser levels inside the trimmed sizes.
     keep_sizes = [length.(level_dims(DD.dims(ras), f; edges=:keep, spatial_dims)) for f in factors[2:end]]
-    outtype = Base.infer_return_type(reducefunc, (Matrix{eltype(ras)},))
-    #outtype = Missing <: eltype(ras) ? Union{Missing, outtypefunc} : outtypefunc
+    outtype = level_eltype(reducefunc, eltype(ras))
     outmin = output_arrays(keep_sizes, outtype)
     ispatial_dims = DD.dimnum(DD.dims(ras),spatial_dims)
 

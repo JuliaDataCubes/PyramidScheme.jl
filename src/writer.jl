@@ -48,7 +48,7 @@ function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=n
     create_multiscales_group(dest, attrs; overwrite)
     write_level(src, levelpath(dest, 0), spatial_dims; layername, chunksize, compressor, attrs=levelattrs)
     if length(factors) > 1
-        t = Base.infer_return_type(resampling_method, (Matrix{nonmissingtype(eltype(src))},))
+        t = level_eltype(resampling_method, eltype(src))
         # The levels are computed with partial windows and trimmed for edges=:drop,
         # the trimmed cells do not contribute to coarser levels.
         keepdims = [level_dims(DD.dims(src), f; edges=:keep, spatial_dims) for f in factors[2:end]]
