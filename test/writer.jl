@@ -106,6 +106,10 @@ end
         mem = Pyramid(src; factors=[1, 2], resampling_method=method)
         @test isequal(Array(parent(pyr.levels[1])), parent(mem.levels[1]))
     end
+    # The default leaves missing values out, as topozarr does
+    pyr = buildpyramids(src, tempname() * ".zarr"; factors=[1, 2])
+    @test Array(parent(pyr.levels[1]))[1, 1] ≈ mean(skipmissing(data[1:2, 1:2]))
+    @test metadata(pyr)["multiscales"]["resampling_method"] == "average"
 end
 
 @testitem "The source is not modified" begin

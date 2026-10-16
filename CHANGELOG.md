@@ -30,6 +30,8 @@ Changelog.generate(
   corresponding storage package, e.g. `using Zarr`.
 - The metadata of `Pyramid(data)` records the convention name of the resampling method, e.g.
   `"average"` for `mean`.
+- `buildpyramids` aggregates with `mean ∘ skipmissing` by default instead of `mean`, like `Pyramid(data)`
+  and topozarr, so missing values are left out instead of making the coarse cell missing.
 
 ### Added
 

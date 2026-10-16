@@ -45,14 +45,14 @@ using YAXArrays
 elevpath = getraster(WorldClim{Elevation},:elev, res="30s")
 elev = Cube(elevpath)
 pyrpath = tempname() * ".zarr"
-@time pyr = PS.buildpyramids(elev, pyrpath; resampling_method=mean, crs="EPSG:4326")
+@time pyr = PS.buildpyramids(elev, pyrpath; crs="EPSG:4326")
 ```
 
 The most important keywords are:
 
 - `nlevels` or `factors`: the levels to build, e.g. `nlevels=3` for factors `[1, 2, 4, 8]` or `factors=[1, 4, 16]`.
   By default enough levels are built for the coarsest one to fit into 256 by 256 cells.
-- `resampling_method`: the function aggregating the cells of a window, e.g. `mean`, `sum` or `mean ∘ skipmissing`.
+- `resampling_method`: the function aggregating the cells of a window, e.g. `mean`, `sum` or `mean ∘ skipmissing` (default), which leaves missing values out.
 - `edges`: `:keep` (default) turns a partial window at the end of a dimension into its own cell, `:drop` leaves it out.
 - `crs`: the coordinate reference system written to the `proj:` attributes. By default it is taken from the dimensions, e.g. of a Rasters.jl `Raster`.
 

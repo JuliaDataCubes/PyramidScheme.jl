@@ -5,8 +5,8 @@
 default_compressor() = ZarrZstd.ZstdCompressor()
 
 """
-    buildpyramids(src, dest; nlevels=nothing, factors=nothing, resampling_method=mean, recursive=true,
-                  edges=:keep, crs=:auto, spatial_dims=SpatialDim, tilesize=256, chunksize=1024,
+    buildpyramids(src, dest; nlevels=nothing, factors=nothing, resampling_method=mean ∘ skipmissing,
+                  recursive=true, edges=:keep, crs=:auto, spatial_dims=SpatialDim, tilesize=256, chunksize=1024,
                   compressor=ZstdCompressor(), consolidated=true, overwrite=false, runner=LocalRunner)
 
 Build a multiscale Zarr v3 store at `dest` from `src` and return it as a [`Pyramid`](@ref).
@@ -20,6 +20,7 @@ group `0` and the aggregated levels are written to the groups `1`, `2`, ...
 - `nlevels`, `factors`: the levels to build, see [`pyramid_factors`](@ref). Without either, enough levels
   are built for the coarsest one to fit into `tilesize`.
 - `resampling_method`: function aggregating a window of cells, e.g. `mean`, `sum` or `mean ∘ skipmissing`.
+  The default `mean ∘ skipmissing` leaves missing values out, a window of only missing values gives `NaN`.
 - `recursive`: compute every level from the previous one instead of from `src`.
 - `edges`: `:keep` turns partial windows at the end of a dimension into a cell, `:drop` leaves them out.
 - `crs`: the coordinate reference system written to the `proj:` attributes, anything `Proj.CRS` accepts.
@@ -34,8 +35,8 @@ group `0` and the aggregated levels are written to the groups `1`, `2`, ...
 buildpyramids(src::AbstractString, dest::AbstractString; kwargs...) = buildpyramids(Cube(src), dest; kwargs...)
 
 function buildpyramids(src::DD.AbstractDimArray, dest::AbstractString; nlevels=nothing, factors=nothing,
-    resampling_method=mean, recursive=true, edges=:keep, crs=:auto, spatial_dims=SpatialDim, tilesize=256,
-    chunksize=1024, compressor=default_compressor(), consolidated=true, overwrite=false, runner=LocalRunner)
+    resampling_method=mean ∘ skipmissing, recursive=true, edges=:keep, crs=:auto, spatial_dims=SpatialDim,
+    tilesize=256, chunksize=1024, compressor=default_compressor(), consolidated=true, overwrite=false, runner=LocalRunner)
     xy = DD.dims(src, spatial_dims)
     length(xy) == 2 || throw(ArgumentError("Expected two spatial dimensions got $xy"))
     factors = pyramid_factors(; nlevels, factors, default_nlevels=compute_nlevels(src, tilesize; spatial_dims))

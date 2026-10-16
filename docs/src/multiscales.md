@@ -14,7 +14,7 @@ for example [topozarr](https://github.com/carbonplan/topozarr) and
 
 ```julia
 using PyramidScheme, YAXArrays, Statistics
-pyr = buildpyramids("input.zarr", "pyramid.zarr"; resampling_method=mean, crs="EPSG:4326")
+pyr = buildpyramids("input.zarr", "pyramid.zarr"; crs="EPSG:4326")
 ```
 
 `buildpyramids(src, dest)` reads `src`, which is either the path of a dataset that YAXArrays can open
