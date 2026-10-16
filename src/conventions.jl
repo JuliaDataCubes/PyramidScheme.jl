@@ -122,7 +122,10 @@ or `nothing` when `d` is shorter than two or not regularly spaced.
 """
 function regular_step(d)
     length(d) < 2 && return nothing
-    steps = diff(Float64.(collect(DD.lookup(d))))
+    l = DD.lookup(d)
+    # A regular span records the step, which avoids collecting the lookup
+    l isa DD.AbstractSampled && DD.span(l) isa DD.Regular && return Float64(step(DD.span(l)))
+    steps = diff(Float64.(collect(l)))
     all(s -> isapprox(s, first(steps); rtol=1e-5), steps) ? first(steps) : nothing
 end
 
